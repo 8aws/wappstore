@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>WAppStore — Tienda de WebApps</title>
+  <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+<nav class="nav" id="main-nav"></nav>
+
+<!-- Hero -->
+<section class="hero">
+  <h1 data-i18n="catalog.title">Descubre las mejores WebApps</h1>
+  <p  data-i18n="catalog.subtitle">La tienda de aplicaciones web progresivas</p>
+  <div class="search-bar">
+    <input id="search-input" type="text" data-i18n-placeholder="catalog.search" placeholder="Buscar aplicaciones…" autocomplete="off"/>
+    <button id="search-btn">🔍</button>
+  </div>
+  <div class="stats-bar" id="stats-bar">
+    <div class="stat"><strong id="stat-apps">…</strong><span data-i18n="catalog.apps">apps</span></div>
+    <div class="stat"><strong id="stat-cats">…</strong><span>categorías</span></div>
+    <div class="stat"><strong id="stat-devs">…</strong><span data-i18n="catalog.developers">desarrolladores</span></div>
+  </div>
+</section>
+
+<!-- Categories -->
+<div class="categories-row" id="categories-row">
+  <div class="cat-chip active" data-cat="" data-i18n="catalog.all">Todas las categorías</div>
+</div>
+
+<!-- Featured -->
+<div id="featured-section" class="section" style="display:none">
+  <div class="section-header"><h2>⭐ <span data-i18n="catalog.featured">Destacadas</span></h2></div>
+  <div class="app-grid" id="featured-grid"></div>
+</div>
+
+<!-- All apps -->
+<div class="section">
+  <div class="section-header">
+    <h2 id="section-title" data-i18n="catalog.recent">Recientes</h2>
+    <span id="total-count" class="text-muted"></span>
+  </div>
+  <div id="app-grid" class="app-grid">
+    <div class="page-loading"><div class="spinner"></div></div>
+  </div>
+  <div class="pagination" id="pagination"></div>
+</div>
+
+<footer class="footer">
+  <p>© 2025 WAppStore — <a href="mailto:admin@wappstore.local">Contacto</a></p>
+</footer>
+
+<script src="/js/i18n.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/nav.js"></script>
+<script>
+const LIMIT   = 24;
+let currentPage   = 0;
+let currentCat    = '';
+let currentSearch = '';
+let allCategories = [];
+
+const t = k => I18N.t(k);
+
+async function init() {
+  // Stats
+  API.getStats().then(s => {
+    document.getElementById('stat-apps').textContent = s.total_apps;
+    document.getElementById('stat-cats').textContent = s.total_cats;
+    document.getElementById('stat-devs').textContent = s.total_devs;
+  });
+  // Categories
+  allCategories = await API.getCategories(I18N.lang).catch(()=>[]);
+  renderCategories();
+  // Featured
+  loadFeatured();
+  // Apps
+  loadApps();
+}
+
+function renderCategories() {
+  const row = document.getElementById('categories-row');
+  // Keep "all" chip
+  const allChip = row.querySelector('[data-cat=""]');
+  allChip.textContent = t('catalog.all');
+  // Remove old cats
+  row.querySelectorAll('[data-cat]:not([data-cat=""])').forEach(c => c.remove());
+  allCategories.forEach(c => {
+    const chip = document.createElement('div');
+    chip.className = 'cat-chip';
+    chip.dataset.cat = c.slug;
+    chip.textContent = `${c.icon} ${c.name} (${c.app_count})`;
+    if (c.slug === currentCat) chip.classList.add('active');
+    chip.addEventListener('click', () => { currentCat = c.slug; currentPage = 0; setActiveChip(); loadApps(); });
+    row.appendChild(chip);
+  });
+  allChip.addEventListener('click', () => { currentCat = ''; currentPage = 0; setActiveChip(); loadApps(); });
+}
+
+function setActiveChip() {
+  document.querySelectorAll('.cat-chip').forEach(c => c.classList.toggle('active', c.dataset.cat === currentCat));
+}
+
+async function loadFeatured() {
+  const data = await API.getApps({ featured: 'true', limit: 8, lang: I18N.lang }).catch(()=>({apps:[]}));
+  if (!data.apps.length) return;
+  document.getElementById('featured-section').style.display = '';
+  document.getElementById('featured-grid').innerHTML = data.apps.map(appCard).join('');
+  attachCardClicks(document.getElementById('featured-grid'));
+}
+
+async function loadApps() {
+  const grid = document.getElementById('app-grid');
+  grid.innerHTML = '<div class="page-loading"><div class="spinner"></div></div>';
+  const params = { limit: LIMIT, offset: currentPage * LIMIT, lang: I18N.lang };
+  if (currentSearch) params.search = currentSearch;
+  if (currentCat)    params.category = currentCat;
+
+  const data = await API.getApps(params).catch(()=>({apps:[],total:0}));
+  const title = document.getElementById('section-title');
+  title.textContent = currentSearch ? `"${currentSearch}"` : t('catalog.recent');
+  document.getElementById('total-count').textContent = data.total ? `${data.total} ${t('catalog.apps')}` : '';
+
+  if (!data.apps.length) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">🔍</div><h3>${t('catalog.empty')}</h3></div>`;
+  } else {
+    grid.innerHTML = data.apps.map(appCard).join('');
+    attachCardClicks(grid);
+  }
+  renderPagination(data.total);
+}
+
+function appCard(app) {
+  const logo = app.logo_url
+    ? `<img class="app-logo" src="${app.logo_url}" alt="${esc(app.name)}" loading="lazy"/>`
+    : `<div class="app-logo-placeholder">${app.category?.icon || '📦'}</div>`;
+  const catName = app.category ? `${app.category.icon||''} ${I18N.lang==='en'?app.category.name_en:app.category.name_es}` : '';
+  const featured = app.featured ? `<span class="featured-badge">⭐</span>` : '';
+  return `
+  <div class="app-card" data-slug="${app.slug}">
+    <div class="app-card-header">
+      ${logo}
+      <div class="app-card-info">
+        <h3>${esc(app.name)} ${featured}</h3>
+        <p class="app-card-desc">${esc(app.short_desc || '')}</p>
+      </div>
+    </div>
+    <div class="app-card-footer">
+      <span class="cat-badge">${catName}</span>
+      <span class="btn btn-primary btn-sm">${t('catalog.view')}</span>
+    </div>
+  </div>`;
+}
+
+function attachCardClicks(container) {
+  container.querySelectorAll('.app-card').forEach(card => {
+    card.addEventListener('click', () => {
+      window.location.href = `/app.html?slug=${card.dataset.slug}`;
+    });
+  });
+}
+
+function renderPagination(total) {
+  const pag   = document.getElementById('pagination');
+  const pages = Math.ceil(total / LIMIT);
+  if (pages <= 1) { pag.innerHTML = ''; return; }
+  let html = '';
+  html += `<button ${currentPage===0?'disabled':''} onclick="goPage(${currentPage-1})">‹</button>`;
+  for (let i = 0; i < pages; i++) {
+    if (pages > 7 && Math.abs(i - currentPage) > 2 && i !== 0 && i !== pages-1) {
+      if (i === 1 || i === pages-2) html += '<button disabled>…</button>';
+      continue;
+    }
+    html += `<button class="${i===currentPage?'active':''}" onclick="goPage(${i})">${i+1}</button>`;
+  }
+  html += `<button ${currentPage===pages-1?'disabled':''} onclick="goPage(${currentPage+1})">›</button>`;
+  pag.innerHTML = html;
+}
+
+function goPage(p) { currentPage = p; loadApps(); window.scrollTo({top:0,behavior:'smooth'}); }
+
+// Search
+document.getElementById('search-btn').addEventListener('click', doSearch);
+document.getElementById('search-input').addEventListener('keydown', e => { if (e.key==='Enter') doSearch(); });
+function doSearch() { currentSearch = document.getElementById('search-input').value.trim(); currentPage=0; loadApps(); }
+
+// Lang change
+document.addEventListener('langchange', () => { renderCategories(); loadFeatured(); loadApps(); });
+
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Administración — WAppStore</title>
+  <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+<nav class="nav" id="main-nav"></nav>
+
+<div class="dash-layout">
+  <aside class="dash-sidebar">
+    <div class="sidebar-label">Admin</div>
+    <ul class="sidebar-nav">
+      <li><button class="active" onclick="showTab('pending')" id="tab-btn-pending">⏳ <span data-i18n="admin.pending">Pendientes</span> <span id="pending-count" class="status-badge status-pending" style="margin-left:auto"></span></button></li>
+      <li><button onclick="showTab('allapps')"  id="tab-btn-allapps">📦 <span data-i18n="admin.all_apps">Todas las apps</span></button></li>
+      <li><button onclick="showTab('cats')"     id="tab-btn-cats">🏷 <span data-i18n="admin.categories">Categorías</span></button></li>
+      <li><button onclick="showTab('users')"    id="tab-btn-users">👥 <span data-i18n="admin.users">Usuarios</span></button></li>
+    </ul>
+  </aside>
+
+  <main class="dash-main">
+    <!-- Stats -->
+    <div class="stats-grid" id="stats-grid"></div>
+
+    <!-- Pending apps -->
+    <div id="tab-pending">
+      <h2 style="margin-bottom:1.5rem">⏳ <span data-i18n="admin.pending">Pendientes de revisión</span></h2>
+      <div id="pending-list"><div class="page-loading"><div class="spinner"></div></div></div>
+    </div>
+
+    <!-- All apps -->
+    <div id="tab-allapps" style="display:none">
+      <div class="flex-b" style="margin-bottom:1.5rem">
+        <h2 data-i18n="admin.all_apps">Todas las apps</h2>
+        <select id="status-filter" class="btn btn-ghost btn-sm" onchange="loadAllApps()">
+          <option value="">Todos los estados</option>
+          <option value="pending">Pendiente</option>
+          <option value="approved">Aprobada</option>
+          <option value="rejected">Rechazada</option>
+        </select>
+      </div>
+      <div id="allapps-list"></div>
+    </div>
+
+    <!-- Categories -->
+    <div id="tab-cats" style="display:none">
+      <div class="flex-b" style="margin-bottom:1.5rem">
+        <h2 data-i18n="admin.categories">Categorías</h2>
+        <button class="btn btn-primary btn-sm" onclick="openCatModal()">➕ <span data-i18n="admin.new_cat">Nueva categoría</span></button>
+      </div>
+      <div id="cats-list"></div>
+    </div>
+
+    <!-- Users -->
+    <div id="tab-users" style="display:none">
+      <h2 style="margin-bottom:1.5rem">👥 <span data-i18n="admin.users">Usuarios</span></h2>
+      <div id="users-list"></div>
+    </div>
+  </main>
+</div>
+
+<!-- Mobile nav -->
+<div class="dash-mobile-nav">
+  <button onclick="showTab('pending')"  id="mob-pending"><span class="ico">⏳</span><span>Pendientes</span></button>
+  <button onclick="showTab('allapps')"  id="mob-allapps"><span class="ico">📦</span><span>Apps</span></button>
+  <button onclick="showTab('cats')"     id="mob-cats"><span class="ico">🏷</span><span>Cats.</span></button>
+  <button onclick="showTab('users')"    id="mob-users"><span class="ico">👥</span><span>Usuarios</span></button>
+</div>
+
+<!-- Category modal -->
+<div id="cat-modal" class="modal-overlay" style="display:none">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="cat-modal-title">Nueva categoría</h3>
+      <button class="modal-close" onclick="closeCatModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="cat-id"/>
+      <div class="form-row">
+        <div class="form-group">
+          <label data-i18n="admin.cat_name_es">Nombre (ES)</label>
+          <input id="cat-es" type="text" required placeholder="Productividad"/>
+        </div>
+        <div class="form-group">
+          <label data-i18n="admin.cat_name_en">Nombre (EN)</label>
+          <input id="cat-en" type="text" required placeholder="Productivity"/>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label data-i18n="admin.cat_icon">Icono (emoji)</label>
+          <input id="cat-icon" type="text" placeholder="📦" maxlength="4"/>
+        </div>
+        <div class="form-group">
+          <label data-i18n="admin.cat_color">Color</label>
+          <input id="cat-color" type="color" value="#6C5CE7" style="height:42px;padding:.3rem .5rem;cursor:pointer"/>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeCatModal()" data-i18n="form.cancel">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveCat()" data-i18n="form.save">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/i18n.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/nav.js"></script>
+<script>
+if (!Auth.isLoggedIn() || !Auth.hasRole('admin')) window.location.href = '/';
+const t   = k => I18N.t(k);
+const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+// ── Tabs ──────────────────────────────────────────────────────────────────
+const TABS = ['pending','allapps','cats','users'];
+function showTab(name) {
+  TABS.forEach(n => {
+    document.getElementById(`tab-${n}`).style.display = n === name ? '' : 'none';
+    document.getElementById(`tab-btn-${n}`)?.classList.toggle('active', n === name);
+    document.getElementById(`mob-${n}`)?.classList.toggle('active', n === name);
+  });
+  if (name === 'pending') loadPending();
+  if (name === 'allapps') loadAllApps();
+  if (name === 'cats')    loadCats();
+  if (name === 'users')   loadUsers();
+}
+
+// ── Stats ──────────────────────────────────────────────────────────────────
+async function loadStats() {
+  const s = await API.adminStats().catch(() => ({}));
+  document.getElementById('stats-grid').innerHTML = [
+    ['📦', 'Apps totales',  s.total_apps],
+    ['⏳', 'Pendientes',    s.pending_apps],
+    ['✅', 'Aprobadas',     s.approved_apps],
+    ['👥', 'Usuarios',      s.total_users],
+    ['🛠', 'Desarrolladores', s.developers],
+  ].map(([ico, label, val]) => `
+    <div class="stat-card">
+      <div class="stat-val">${ico} ${val ?? '…'}</div>
+      <div class="stat-label">${label}</div>
+    </div>`).join('');
+
+  if (s.pending_apps) {
+    document.getElementById('pending-count').textContent = s.pending_apps;
+  }
+}
+
+// ── Pending ───────────────────────────────────────────────────────────────
+async function loadPending() {
+  const el = document.getElementById('pending-list');
+  el.innerHTML = '<div class="page-loading"><div class="spinner"></div></div>';
+  const { apps = [] } = await API.adminApps({ status: 'pending', limit: 100 }).catch(() => ({ apps: [] }));
+  if (!apps.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div><h3>No hay apps pendientes</h3></div>';
+    return;
+  }
+  el.innerHTML = apps.map(app => `
+    <div class="detail-card" style="margin-bottom:1rem">
+      <div style="display:flex;gap:1rem;align-items:flex-start">
+        ${app.logo_url ? `<img src="${esc(app.logo_url)}" style="width:72px;height:72px;border-radius:14px;object-fit:cover;flex-shrink:0"/>` : `<div style="width:72px;height:72px;border-radius:14px;background:linear-gradient(135deg,#7B6CF7,#00BFA5);display:flex;align-items:center;justify-content:center;font-size:2rem;flex-shrink:0">📦</div>`}
+        <div style="flex:1;min-width:0">
+          <div class="flex-b">
+            <h3>${esc(app.name)}</h3>
+            <span class="status-badge status-${app.status}">${t('status.'+app.status)}</span>
+          </div>
+          <p class="text-muted" style="font-size:.85rem;margin:.3rem 0">${esc(app.short_desc_es||app.short_desc_en||'')}</p>
+          <div style="display:flex;flex-wrap:wrap;gap:.4rem;font-size:.78rem;color:var(--muted)">
+            <span>🔗 <a href="${esc(app.url)}" target="_blank">${esc(app.url)}</a></span>
+            <span>👤 ${esc(app.dev_name||'—')}</span>
+            <span>📅 ${new Date(app.created_at).toLocaleDateString()}</span>
+          </div>
+          <div style="display:flex;gap:.5rem;margin-top:.85rem">
+            <button class="btn btn-success btn-sm" onclick="setStatus(${app.id},'approved')">✅ ${t('admin.approve')}</button>
+            <button class="btn btn-danger btn-sm"  onclick="setStatus(${app.id},'rejected')">❌ ${t('admin.reject')}</button>
+            <button class="btn btn-ghost  btn-sm"  onclick="toggleFeatured(${app.id},${app.featured?0:1})">⭐ ${t('admin.featured')}</button>
+            <a href="/app.html?slug=${esc(app.slug)}" target="_blank" class="btn btn-ghost btn-sm">👁 Ver</a>
+          </div>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+// ── All apps ──────────────────────────────────────────────────────────────
+async function loadAllApps() {
+  const el = document.getElementById('allapps-list');
+  el.innerHTML = '<div class="page-loading"><div class="spinner"></div></div>';
+  const status = document.getElementById('status-filter').value;
+  const { apps = [] } = await API.adminApps({ status, limit: 200 }).catch(() => ({ apps: [] }));
+  if (!apps.length) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><h3>Sin resultados</h3></div>'; return; }
+  el.innerHTML = `
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th></th><th>Nombre</th><th>Developer</th><th>Estado</th><th>Destacada</th><th>Fecha</th><th>Acciones</th></tr></thead>
+        <tbody>
+        ${apps.map(app => `
+          <tr>
+            <td><img src="${app.logo_url||''}" style="width:32px;height:32px;border-radius:8px;object-fit:cover;background:var(--surface2)" onerror="this.style.display='none'"/></td>
+            <td><strong>${esc(app.name)}</strong><br><span class="text-muted text-small">${esc(app.slug)}</span></td>
+            <td class="text-muted text-small">${esc(app.dev_name||'—')}</td>
+            <td>
+              <select class="btn btn-ghost btn-sm" onchange="setStatus(${app.id},this.value)" style="padding:.25rem .5rem">
+                <option value="pending"  ${app.status==='pending' ?'selected':''}>⏳ Pendiente</option>
+                <option value="approved" ${app.status==='approved'?'selected':''}>✅ Aprobada</option>
+                <option value="rejected" ${app.status==='rejected'?'selected':''}>❌ Rechazada</option>
+              </select>
+            </td>
+            <td><button class="btn btn-ghost btn-sm" onclick="toggleFeatured(${app.id},${app.featured?0:1})">${app.featured?'⭐':'☆'}</button></td>
+            <td class="text-muted text-small">${new Date(app.created_at).toLocaleDateString()}</td>
+            <td><button class="btn btn-danger btn-sm" onclick="adminDeleteApp(${app.id},'${esc(app.name)}')">🗑</button></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+async function setStatus(id, status) {
+  await API.adminSetStatus(id, status).catch(ex => toast.error(ex.message));
+  toast.success(status === 'approved' ? t('msg.approved') : t('msg.rejected'));
+  loadStats();
+  const curTab = TABS.find(n => document.getElementById(`tab-${n}`).style.display !== 'none');
+  if (curTab === 'pending') loadPending();
+  if (curTab === 'allapps') loadAllApps();
+}
+
+async function toggleFeatured(id, val) {
+  await API.adminSetFeatured(id, val).catch(ex => toast.error(ex.message));
+  toast.success(val ? '⭐ App destacada' : 'App sin destacar');
+  const curTab = TABS.find(n => document.getElementById(`tab-${n}`).style.display !== 'none');
+  if (curTab === 'pending') loadPending();
+  if (curTab === 'allapps') loadAllApps();
+}
+
+async function adminDeleteApp(id, name) {
+  if (!confirm(`${t('msg.confirm_delete')}\n"${name}"`)) return;
+  await API.adminDeleteApp(id).catch(ex => toast.error(ex.message));
+  toast.success(t('msg.deleted'));
+  loadStats(); loadAllApps();
+}
+
+// ── Categories ────────────────────────────────────────────────────────────
+let editCatId = null;
+async function loadCats() {
+  const el   = document.getElementById('cats-list');
+  const cats = await API.adminCategories().catch(() => []);
+  el.innerHTML = `
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Icono</th><th>Nombre ES</th><th>Nombre EN</th><th>Color</th><th>Slug</th><th>Acciones</th></tr></thead>
+        <tbody>
+        ${cats.map(c => `
+          <tr>
+            <td style="font-size:1.4rem">${c.icon}</td>
+            <td><strong>${esc(c.name_es)}</strong></td>
+            <td>${esc(c.name_en)}</td>
+            <td><span style="display:inline-block;width:24px;height:24px;border-radius:50%;background:${esc(c.color)}"></span></td>
+            <td class="text-muted text-small">${esc(c.slug)}</td>
+            <td>
+              <div class="flex gap-1">
+                <button class="btn btn-ghost btn-sm" onclick="openCatModal(${c.id},'${esc(c.name_es)}','${esc(c.name_en)}','${c.icon||''}','${c.color||''}')">✏️</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteCat(${c.id},'${esc(c.name_es)}')">🗑</button>
+              </div>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function openCatModal(id, es, en, icon, color) {
+  editCatId = id || null;
+  document.getElementById('cat-modal-title').textContent = id ? 'Editar categoría' : 'Nueva categoría';
+  document.getElementById('cat-id').value    = id || '';
+  document.getElementById('cat-es').value    = es || '';
+  document.getElementById('cat-en').value    = en || '';
+  document.getElementById('cat-icon').value  = icon || '📦';
+  document.getElementById('cat-color').value = color || '#6C5CE7';
+  document.getElementById('cat-modal').style.display = 'flex';
+}
+function closeCatModal() { document.getElementById('cat-modal').style.display = 'none'; editCatId = null; }
+
+async function saveCat() {
+  const data = {
+    name_es: document.getElementById('cat-es').value,
+    name_en: document.getElementById('cat-en').value,
+    icon:    document.getElementById('cat-icon').value,
+    color:   document.getElementById('cat-color').value,
+  };
+  try {
+    if (editCatId) await API.adminUpdateCat(editCatId, data);
+    else           await API.adminCreateCat(data);
+    toast.success(t('msg.saved'));
+    closeCatModal();
+    loadCats();
+  } catch (ex) { toast.error(ex.message); }
+}
+
+async function deleteCat(id, name) {
+  if (!confirm(`${t('msg.confirm_delete')}\n"${name}"`)) return;
+  await API.adminDeleteCat(id).catch(ex => toast.error(ex.message));
+  toast.success(t('msg.deleted'));
+  loadCats();
+}
+
+// ── Users ─────────────────────────────────────────────────────────────────
+async function loadUsers() {
+  const el    = document.getElementById('users-list');
+  el.innerHTML = '<div class="page-loading"><div class="spinner"></div></div>';
+  const users = await API.adminUsers().catch(() => []);
+  el.innerHTML = `
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Apps</th><th>Activo</th><th>Registro</th><th>Acciones</th></tr></thead>
+        <tbody>
+        ${users.map(u => `
+          <tr>
+            <td><strong>${esc(u.name)}</strong></td>
+            <td class="text-muted">${esc(u.email)}</td>
+            <td>
+              <select class="btn btn-ghost btn-sm" onchange="updateUser(${u.id},{role:this.value})">
+                <option value="client"    ${u.role==='client'   ?'selected':''}>👤 Cliente</option>
+                <option value="developer" ${u.role==='developer'?'selected':''}>🛠 Dev</option>
+                <option value="admin"     ${u.role==='admin'    ?'selected':''}>⚡ Admin</option>
+              </select>
+            </td>
+            <td>${u.app_count}</td>
+            <td>
+              <label class="form-check">
+                <input type="checkbox" ${u.active?'checked':''} onchange="updateUser(${u.id},{active:this.checked})"/>
+              </label>
+            </td>
+            <td class="text-muted text-small">${new Date(u.created_at).toLocaleDateString()}</td>
+            <td>
+              <button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id},'${esc(u.name)}')">🗑</button>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+async function updateUser(id, data) {
+  await API.adminUpdateUser(id, data).catch(ex => toast.error(ex.message));
+  toast.success(t('msg.saved'));
+}
+
+async function deleteUser(id, name) {
+  if (!confirm(`${t('msg.confirm_delete')}\n"${name}"`)) return;
+  await API.adminDeleteUser(id).catch(ex => toast.error(ex.message));
+  toast.success(t('msg.deleted'));
+  loadUsers();
+}
+
+document.addEventListener('langchange', () => I18N.applyAll());
+
+loadStats();
+showTab('pending');
+</script>
+</body>
+</html>

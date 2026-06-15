@@ -1,0 +1,73 @@
+version: "3.8"
+
+# ── WAppStore · Cosmos Cloud deployment ───────────────────────────────────
+# 1. Construir la imagen en el servidor:
+#      rsync -avz --exclude='node_modules' --exclude='data' --exclude='uploads' \
+#        ./  usuario@servidor:/opt/wappstore/
+#      ssh usuario@servidor "cd /opt/wappstore && docker build -t wappstore:latest ."
+#
+# 2. Pegar este YAML en Cosmos Cloud → New Service → Docker Compose
+#
+# 3. En Cosmos → URL Manager, añadir la ruta:
+#      Host:   wappstore.uverse.es
+#      Target: http://wappstore:3000
+#      SSL:    Let's Encrypt (automático)
+# ──────────────────────────────────────────────────────────────────────────
+
+services:
+  wappstore:
+    build:
+      context: /share/external/DEV3302_1/wappstore
+      dockerfile: Dockerfile
+    image: wappstore:latest
+    pull_policy: never
+    container_name: wappstore
+    restart: unless-stopped
+
+    networks:
+      - cosmos-network
+
+    environment:
+      PORT: "3000"
+      NODE_ENV: production
+      # ⚠️ NO pongas secretos reales aquí: este archivo está versionado en un repo público.
+      # Genera el JWT_SECRET con:  openssl rand -base64 48
+      JWT_SECRET: "CHANGE_ME__openssl_rand_base64_48"
+      ADMIN_EMAIL: "admin@wappstore.uverse.es"
+      ADMIN_PASSWORD: "CHANGE_ME__set_a_strong_password"
+      DB_PATH: "/app/data/wappstore.db"
+
+    volumes:
+      - wappstore-data:/app/data
+      - wappstore-uploads:/app/uploads
+
+    # Cosmos Cloud leerá este label para pre-configurar la ruta
+    labels:
+      - "cosmos-url=wappstore.uverse.es"
+      - "cosmos-port=3000"
+      - "cosmos-ssl=true"
+      - "cosmos-force-redirect=true"
+      - "cosmos-network=cosmos-network"
+      - "cosmos-src-regex=false"
+      - "cosmos-strip-prefix=false"
+
+    healthcheck:
+      test: ["CMD", "node", "-e",
+        "require('http').get('http://localhost:3000/api/public/stats', r => process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+# ── Conectar a la red interna de Cosmos (reverse proxy) ───────────────────
+networks:
+  cosmos-network:
+    external: true
+    name: cosmos-network
+
+# ── Volúmenes persistentes ────────────────────────────────────────────────
+volumes:
+  wappstore-data:
+    driver: local
+  wappstore-uploads:
+    driver: local

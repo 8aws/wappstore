@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Mi panel — WAppStore</title>
+  <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+<nav class="nav" id="main-nav"></nav>
+
+<div class="dash-layout">
+  <!-- Sidebar -->
+  <aside class="dash-sidebar">
+    <div class="sidebar-label">Menú</div>
+    <ul class="sidebar-nav">
+      <li><button class="active" onclick="showTab('apps')" id="tab-btn-apps">📦 <span data-i18n="dash.my_apps">Mis aplicaciones</span></button></li>
+      <li><button onclick="showTab('new')"  id="tab-btn-new">➕ <span data-i18n="dash.new_app">Nueva app</span></button></li>
+    </ul>
+  </aside>
+
+  <!-- Main content -->
+  <main class="dash-main">
+    <!-- My apps -->
+    <div id="tab-apps">
+      <div class="flex-b" style="margin-bottom:1.5rem">
+        <h2 data-i18n="dash.my_apps">Mis aplicaciones</h2>
+        <button class="btn btn-primary btn-sm" onclick="showTab('new')">➕ <span data-i18n="dash.new_app">Nueva app</span></button>
+      </div>
+      <div id="apps-list"><div class="page-loading"><div class="spinner"></div></div></div>
+    </div>
+
+    <!-- New / Edit app -->
+    <div id="tab-new" style="display:none">
+      <div class="flex-b" style="margin-bottom:1.5rem">
+        <h2 id="form-title">Nueva aplicación</h2>
+        <button class="btn btn-ghost btn-sm" onclick="showTab('apps')">← Volver</button>
+      </div>
+      <div style="max-width:820px">
+        <form id="app-form" autocomplete="off">
+          <input type="hidden" id="edit-id"/>
+          <!-- Basic -->
+          <div class="detail-card" style="margin-bottom:1rem">
+            <h3 style="margin-bottom:1rem">Información básica</h3>
+            <div class="form-group">
+              <label data-i18n="form.name">Nombre de la app</label>
+              <input id="f-name" type="text" required placeholder="Mi WebApp"/>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label data-i18n="form.short_es">Descripción corta (ES)</label>
+                <input id="f-short-es" type="text" placeholder="Breve descripción en español" maxlength="160"/>
+              </div>
+              <div class="form-group">
+                <label data-i18n="form.short_en">Descripción corta (EN)</label>
+                <input id="f-short-en" type="text" placeholder="Short description in English" maxlength="160"/>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label data-i18n="form.desc_es">Descripción completa (ES)</label>
+                <textarea id="f-desc-es" rows="4" placeholder="Describe tu app en español…"></textarea>
+              </div>
+              <div class="form-group">
+                <label data-i18n="form.desc_en">Descripción completa (EN)</label>
+                <textarea id="f-desc-en" rows="4" placeholder="Describe your app in English…"></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- URLs & contact -->
+          <div class="detail-card" style="margin-bottom:1rem">
+            <h3 style="margin-bottom:1rem">URLs y contacto</h3>
+            <div class="form-group">
+              <label data-i18n="form.url">URL de la webapp *</label>
+              <input id="f-url" type="url" required placeholder="https://miapp.example.com"/>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label data-i18n="form.contact">Email de contacto</label>
+                <input id="f-contact" type="email" placeholder="contacto@ejemplo.com"/>
+              </div>
+              <div class="form-group">
+                <label data-i18n="form.source">Código fuente (URL)</label>
+                <input id="f-source" type="url" placeholder="https://github.com/…"/>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label data-i18n="form.privacy">Política de privacidad</label>
+                <input id="f-privacy" type="url" placeholder="https://…/privacy"/>
+              </div>
+              <div class="form-group">
+                <label data-i18n="form.terms">Términos de uso</label>
+                <input id="f-terms" type="url" placeholder="https://…/terms"/>
+              </div>
+            </div>
+          </div>
+
+          <!-- Technical -->
+          <div class="detail-card" style="margin-bottom:1rem">
+            <h3 style="margin-bottom:1rem">Detalles técnicos</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label data-i18n="form.category">Categoría</label>
+                <select id="f-category"><option value="">Sin categoría</option></select>
+              </div>
+              <div class="form-group">
+                <label data-i18n="form.platform">Plataforma</label>
+                <select id="f-platform">
+                  <option value="pwa">PWA</option>
+                  <option value="web">Web App</option>
+                  <option value="hybrid">Hybrid</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label data-i18n="form.version">Versión</label>
+                <input id="f-version" type="text" placeholder="1.0.0"/>
+              </div>
+              <div class="form-group">
+                <label data-i18n="form.size">Tamaño (KB)</label>
+                <input id="f-size" type="number" placeholder="512"/>
+              </div>
+            </div>
+            <div class="form-group">
+              <label data-i18n="form.tags">Etiquetas (separadas por coma)</label>
+              <input id="f-tags" type="text" placeholder="productividad, organización, notas"/>
+            </div>
+            <div class="form-group">
+              <label data-i18n="form.languages">Idiomas soportados</label>
+              <input id="f-langs" type="text" placeholder="es, en, fr"/>
+            </div>
+            <div style="display:flex;gap:2rem;margin-top:.5rem">
+              <label class="form-check"><input type="checkbox" id="f-pwa"/> <span data-i18n="form.pwa">Es instalable como PWA</span></label>
+              <label class="form-check"><input type="checkbox" id="f-offline"/> <span data-i18n="form.offline">Funciona sin conexión</span></label>
+            </div>
+          </div>
+
+          <!-- Media -->
+          <div class="detail-card" id="media-card" style="display:none;margin-bottom:1rem">
+            <h3 style="margin-bottom:1rem">Media e iconos</h3>
+            <div class="form-group">
+              <label data-i18n="form.logo">Logo de la app</label>
+              <div class="upload-zone" id="logo-zone">
+                <div class="icon">🖼</div>
+                <p>Arrastra tu logo aquí o <strong>haz clic para seleccionar</strong></p>
+                <p class="text-small text-muted">PNG, JPG, SVG · Recomendado 512×512 px</p>
+              </div>
+              <div id="logo-preview" class="mt-1"></div>
+            </div>
+            <div class="form-group">
+              <label data-i18n="form.screenshots">Capturas de pantalla (máx. 10)</label>
+              <div class="upload-zone" id="ss-zone">
+                <div class="icon">📷</div>
+                <p>Arrastra las capturas aquí o <strong>haz clic para seleccionar</strong></p>
+                <p class="text-small text-muted">PNG, JPG · Máx. 10 imágenes · 15 MB c/u</p>
+              </div>
+              <div class="upload-preview" id="ss-preview"></div>
+            </div>
+          </div>
+
+          <div id="form-error" class="alert alert-error" style="display:none"></div>
+          <div style="display:flex;gap:1rem">
+            <button type="submit" class="btn btn-primary" id="form-submit-btn" data-i18n="form.submit">Enviar para revisión</button>
+            <button type="button" class="btn btn-ghost" onclick="showTab('apps')" data-i18n="form.cancel">Cancelar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Mobile bottom nav -->
+<div class="dash-mobile-nav">
+  <button onclick="showTab('apps')" id="mob-btn-apps"><span class="ico">📦</span><span data-i18n="dash.my_apps">Mis apps</span></button>
+  <button onclick="showTab('new')"  id="mob-btn-new"><span class="ico">➕</span><span data-i18n="dash.new_app">Nueva</span></button>
+</div>
+
+<script src="/js/i18n.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/nav.js"></script>
+<script>
+const t   = k => I18N.t(k);
+const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+// Auth guard
+if (!Auth.isLoggedIn()) { window.location.href = '/login.html?next=/dashboard.html'; }
+if (!Auth.hasRole('developer','admin')) { window.location.href = '/'; }
+
+let categories  = [];
+let editingId   = null;
+let logoFile    = null;
+let ssFiles     = [];
+
+// ── Tabs ──────────────────────────────────────────────────────────────────
+function showTab(name) {
+  ['apps','new'].forEach(n => {
+    document.getElementById(`tab-${n}`).style.display = n === name ? '' : 'none';
+    document.getElementById(`tab-btn-${n}`)?.classList.toggle('active', n === name);
+    document.getElementById(`mob-btn-${n}`)?.classList.toggle('active', n === name);
+  });
+  if (name === 'apps')  loadMyApps();
+  if (name === 'new' && !editingId) resetForm();
+}
+
+// ── Load my apps ──────────────────────────────────────────────────────────
+async function loadMyApps() {
+  const container = document.getElementById('apps-list');
+  container.innerHTML = '<div class="page-loading"><div class="spinner"></div></div>';
+  const apps = await API.myApps().catch(() => []);
+  if (!apps.length) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">📦</div>
+        <h3>${t('dash.no_apps')}</h3>
+        <p class="text-muted mt-1">${t('dash.submit_new')}</p>
+        <button class="btn btn-primary mt-2" onclick="showTab('new')">➕ ${t('dash.new_app')}</button>
+      </div>`;
+    return;
+  }
+  container.innerHTML = `
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th></th><th>Nombre</th><th>Estado</th><th>Plataforma</th><th>Actualizado</th><th>${t('dash.actions')}</th>
+        </tr></thead>
+        <tbody>
+        ${apps.map(app => `
+          <tr>
+            <td style="width:48px">${app.logo_url ? `<img src="${esc(app.logo_url)}" style="width:36px;height:36px;border-radius:8px;object-fit:cover"/>` : `<div style="width:36px;height:36px;border-radius:8px;background:linear-gradient(135deg,#7B6CF7,#00BFA5);display:flex;align-items:center;justify-content:center;font-size:1.1rem">📦</div>`}</td>
+            <td><strong>${esc(app.name)}</strong><br><span class="text-muted text-small">${esc(app.url)}</span></td>
+            <td><span class="status-badge status-${app.status}">${t('status.'+app.status)}</span></td>
+            <td><span class="platform-badge">${(app.platform||'pwa').toUpperCase()}</span></td>
+            <td class="text-muted text-small">${new Date(app.updated_at).toLocaleDateString()}</td>
+            <td>
+              <div class="flex gap-1">
+                <button class="btn btn-ghost btn-sm" onclick="editApp(${app.id})">✏️ ${t('dash.edit')}</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteApp(${app.id},'${esc(app.name)}')">🗑</button>
+              </div>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+// ── Form helpers ──────────────────────────────────────────────────────────
+async function loadCategories() {
+  if (categories.length) return;
+  categories = await API.getCategories(I18N.lang).catch(() => []);
+  const sel = document.getElementById('f-category');
+  categories.forEach(c => {
+    const o = document.createElement('option');
+    o.value = c.id;
+    o.textContent = `${c.icon} ${c.name}`;
+    sel.appendChild(o);
+  });
+}
+
+function resetForm() {
+  editingId = null; logoFile = null; ssFiles = [];
+  document.getElementById('app-form').reset();
+  document.getElementById('edit-id').value = '';
+  document.getElementById('form-title').textContent = t('dash.new_app');
+  document.getElementById('form-submit-btn').textContent = t('form.submit');
+  document.getElementById('logo-preview').innerHTML = '';
+  document.getElementById('ss-preview').innerHTML = '';
+  document.getElementById('media-card').style.display = 'none';
+  document.getElementById('form-error').style.display = 'none';
+}
+
+async function editApp(id) {
+  editingId = id;
+  await loadCategories();
+  const app = await API.myApp(id).catch(() => null);
+  if (!app) return;
+
+  document.getElementById('form-title').textContent = `✏️ ${t('dash.edit')}: ${app.name}`;
+  document.getElementById('form-submit-btn').textContent = t('form.save');
+  document.getElementById('edit-id').value = id;
+  document.getElementById('f-name').value     = app.name || '';
+  document.getElementById('f-short-es').value = app.short_desc_es || '';
+  document.getElementById('f-short-en').value = app.short_desc_en || '';
+  document.getElementById('f-desc-es').value  = app.description_es || '';
+  document.getElementById('f-desc-en').value  = app.description_en || '';
+  document.getElementById('f-url').value       = app.url || '';
+  document.getElementById('f-contact').value   = app.contact_email || '';
+  document.getElementById('f-source').value    = app.source_url || '';
+  document.getElementById('f-privacy').value   = app.privacy_url || '';
+  document.getElementById('f-terms').value     = app.terms_url || '';
+  document.getElementById('f-version').value   = app.version || '';
+  document.getElementById('f-size').value      = app.size_kb || '';
+  document.getElementById('f-tags').value      = (app.tags||[]).join(', ');
+  document.getElementById('f-langs').value     = (app.languages||[]).join(', ');
+  document.getElementById('f-platform').value  = app.platform || 'pwa';
+  document.getElementById('f-pwa').checked     = !!app.pwa_installable;
+  document.getElementById('f-offline').checked = !!app.has_offline;
+  if (app.category_id) document.getElementById('f-category').value = app.category_id;
+
+  // Show media card with existing media
+  document.getElementById('media-card').style.display = '';
+  if (app.logo_url) {
+    document.getElementById('logo-preview').innerHTML =
+      `<img src="${esc(app.logo_url)}" style="width:80px;height:80px;border-radius:12px;object-fit:cover;border:1px solid var(--border)"/>`;
+  }
+  if (app.screenshots?.length) {
+    document.getElementById('ss-preview').innerHTML = app.screenshots.map(ss => `
+      <div class="preview-img" id="ss-${ss.id}">
+        <img src="${esc(ss.url)}" alt="ss"/>
+        <button class="remove-btn" onclick="removeScreenshot(${ss.id})">✕</button>
+      </div>`).join('');
+  }
+
+  showTab('new');
+}
+
+async function removeScreenshot(id) {
+  await API.deleteScreenshot(id).catch(() => {});
+  document.getElementById(`ss-${id}`)?.remove();
+}
+
+async function deleteApp(id, name) {
+  if (!confirm(`${t('msg.confirm_delete')}\n"${name}"`)) return;
+  await API.deleteApp(id).catch(ex => toast.error(ex.message));
+  loadMyApps();
+  toast.success(t('msg.deleted'));
+}
+
+// ── Upload zones ──────────────────────────────────────────────────────────
+function setupUploadZone(zoneId, inputId, multi, onFiles) {
+  const zone  = document.getElementById(zoneId);
+  const input = document.createElement('input');
+  input.type  = 'file';
+  input.id    = inputId;
+  input.accept= 'image/*';
+  if (multi) input.multiple = true;
+  input.style.display = 'none';
+  document.body.appendChild(input);
+
+  zone.addEventListener('click', () => input.click());
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault(); zone.classList.remove('dragover');
+    onFiles(Array.from(e.dataTransfer.files));
+  });
+  input.addEventListener('change', () => onFiles(Array.from(input.files)));
+}
+
+setupUploadZone('logo-zone','logo-input', false, files => {
+  if (!files.length) return;
+  logoFile = files[0];
+  const url = URL.createObjectURL(logoFile);
+  document.getElementById('logo-preview').innerHTML =
+    `<img src="${url}" style="width:80px;height:80px;border-radius:12px;object-fit:cover;border:1px solid var(--border)"/>`;
+});
+
+setupUploadZone('ss-zone','ss-input', true, files => {
+  ssFiles = [...ssFiles, ...files].slice(0, 10);
+  const prev = document.getElementById('ss-preview');
+  prev.innerHTML = ssFiles.map((f, i) =>
+    `<div class="preview-img"><img src="${URL.createObjectURL(f)}" alt="ss"/><button class="remove-btn" onclick="removeSsFile(${i})">✕</button></div>`
+  ).join('');
+});
+
+function removeSsFile(idx) {
+  ssFiles.splice(idx, 1);
+  const prev = document.getElementById('ss-preview');
+  prev.innerHTML = ssFiles.map((f, i) =>
+    `<div class="preview-img"><img src="${URL.createObjectURL(f)}" alt="ss"/><button class="remove-btn" onclick="removeSsFile(${i})">✕</button></div>`
+  ).join('');
+}
+
+// ── Form submit ───────────────────────────────────────────────────────────
+document.getElementById('app-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const btn = document.getElementById('form-submit-btn');
+  const err = document.getElementById('form-error');
+  err.style.display = 'none';
+  btn.disabled = true; btn.textContent = '…';
+
+  try {
+    const payload = {
+      name:           document.getElementById('f-name').value,
+      short_desc_es:  document.getElementById('f-short-es').value,
+      short_desc_en:  document.getElementById('f-short-en').value,
+      description_es: document.getElementById('f-desc-es').value,
+      description_en: document.getElementById('f-desc-en').value,
+      url:            document.getElementById('f-url').value,
+      contact_email:  document.getElementById('f-contact').value,
+      source_url:     document.getElementById('f-source').value,
+      privacy_url:    document.getElementById('f-privacy').value,
+      terms_url:      document.getElementById('f-terms').value,
+      category_id:    document.getElementById('f-category').value || null,
+      platform:       document.getElementById('f-platform').value,
+      version:        document.getElementById('f-version').value,
+      size_kb:        document.getElementById('f-size').value || null,
+      tags:           document.getElementById('f-tags').value,
+      languages:      document.getElementById('f-langs').value,
+      pwa_installable:document.getElementById('f-pwa').checked,
+      has_offline:    document.getElementById('f-offline').checked,
+    };
+
+    let app;
+    if (editingId) {
+      app = await API.updateApp(editingId, payload);
+      toast.success(t('msg.app_updated'));
+    } else {
+      app = await API.createApp(payload);
+      toast.success(t('msg.app_submitted'));
+    }
+
+    // Upload logo
+    if (logoFile) {
+      btn.textContent = 'Subiendo logo…';
+      const fd = new FormData();
+      fd.append('logo', logoFile);
+      await API.uploadLogo(app.id, fd).catch(ex => toast.error('Logo: ' + ex.message));
+    }
+
+    // Upload screenshots
+    if (ssFiles.length) {
+      btn.textContent = 'Subiendo capturas…';
+      const fd = new FormData();
+      ssFiles.forEach(f => fd.append('screenshots', f));
+      await API.uploadScreenshots(app.id, fd).catch(ex => toast.error('Screenshots: ' + ex.message));
+    }
+
+    showTab('apps');
+  } catch (ex) {
+    err.textContent = ex.message;
+    err.style.display = 'flex';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = editingId ? t('form.save') : t('form.submit');
+  }
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────
+document.addEventListener('langchange', () => I18N.applyAll());
+
+async function init() {
+  await loadCategories();
+  showTab('apps');
+}
+
+init();
+</script>
+</body>
+</html>

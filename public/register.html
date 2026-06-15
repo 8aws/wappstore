@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Registro — WAppStore</title>
+  <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body class="auth-page">
+<div class="auth-card">
+  <div class="logo"><a href="/">WAppStore</a></div>
+  <h2 data-i18n="auth.register">Crear cuenta</h2>
+  <p class="subtitle">Únete a WAppStore como desarrollador o cliente</p>
+
+  <!-- Role selector -->
+  <div class="role-selector" id="role-selector">
+    <div class="role-option selected" data-role="client" onclick="selectRole('client')">
+      <div class="role-icon">👤</div>
+      <div class="role-name" data-i18n="auth.client">Cliente</div>
+      <div class="role-desc" data-i18n="auth.client_desc">Descubre y usa WebApps</div>
+    </div>
+    <div class="role-option" data-role="developer" onclick="selectRole('developer')">
+      <div class="role-icon">🛠</div>
+      <div class="role-name" data-i18n="auth.developer">Desarrollador</div>
+      <div class="role-desc" data-i18n="auth.developer_desc">Publica tu WebApp</div>
+    </div>
+  </div>
+  <input type="hidden" id="selected-role" value="client"/>
+
+  <form id="register-form">
+    <div class="form-group">
+      <label data-i18n="auth.name">Nombre completo</label>
+      <input id="name" type="text" required autocomplete="name" placeholder="Tu nombre"/>
+    </div>
+    <div class="form-group">
+      <label data-i18n="auth.email">Correo electrónico</label>
+      <input id="email" type="email" required autocomplete="email" placeholder="correo@ejemplo.com"/>
+    </div>
+    <div class="form-group">
+      <label data-i18n="auth.password">Contraseña</label>
+      <input id="password" type="password" required minlength="6" placeholder="Mínimo 6 caracteres"/>
+    </div>
+    <div id="reg-error" class="alert alert-error mt-1" style="display:none"></div>
+    <button type="submit" id="reg-btn" class="btn btn-primary w-full mt-2">
+      <span data-i18n="auth.submit_register">Crear cuenta</span>
+    </button>
+  </form>
+
+  <div class="auth-divider"><span>o</span></div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:.5rem">
+    <span class="text-muted text-small" data-i18n="auth.have_account">¿Ya tienes cuenta?</span>
+    <a href="/login.html" class="btn btn-outline btn-sm" data-i18n="auth.login">Iniciar sesión</a>
+  </div>
+</div>
+
+<div id="lang-float" style="position:fixed;bottom:1.5rem;right:1.5rem"></div>
+
+<script src="/js/i18n.js"></script>
+<script src="/js/api.js"></script>
+<script>
+  if (Auth.isLoggedIn()) window.location.href = '/';
+  I18N.renderToggle(document.getElementById('lang-float'));
+  I18N.applyAll();
+  document.addEventListener('langchange', () => I18N.applyAll());
+
+  function selectRole(role) {
+    document.getElementById('selected-role').value = role;
+    document.querySelectorAll('.role-option').forEach(o => o.classList.toggle('selected', o.dataset.role === role));
+  }
+
+  document.getElementById('register-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const btn = document.getElementById('reg-btn');
+    const err = document.getElementById('reg-error');
+    err.style.display = 'none';
+    btn.disabled = true; btn.textContent = '…';
+    try {
+      const data = await API.register({
+        name:     document.getElementById('name').value,
+        email:    document.getElementById('email').value,
+        password: document.getElementById('password').value,
+        role:     document.getElementById('selected-role').value,
+      });
+      Auth.setSession(data.token, data.user);
+      window.location.href = data.user.role === 'developer' ? '/dashboard.html' : '/';
+    } catch (ex) {
+      err.textContent = ex.message;
+      err.style.display = 'flex';
+      btn.disabled = false; btn.textContent = I18N.t('auth.submit_register');
+    }
+  });
+</script>
+</body>
+</html>

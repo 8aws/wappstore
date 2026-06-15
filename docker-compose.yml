@@ -1,0 +1,28 @@
+version: "3.9"
+
+services:
+  wappstore:
+    build: .
+    container_name: wappstore
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      - PORT=3000
+      - JWT_SECRET=${JWT_SECRET:-change-this-secret-in-production}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@wappstore.local}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-Admin1234!}
+      - DB_PATH=/app/data/wappstore.db
+    volumes:
+      - wappstore_data:/app/data
+      - wappstore_uploads:/app/uploads
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/public/stats', r => process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  wappstore_data:
+  wappstore_uploads:

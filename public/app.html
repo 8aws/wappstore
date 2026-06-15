@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>App — WAppStore</title>
+  <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body>
+<nav class="nav" id="main-nav"></nav>
+
+<!-- App hero -->
+<section class="app-hero" id="app-hero">
+  <div class="app-hero-inner">
+    <div class="app-hero-logo-placeholder" id="hero-logo">📦</div>
+    <div class="app-hero-info">
+      <h1 id="hero-name">…</h1>
+      <div class="app-hero-meta" id="hero-meta"></div>
+      <div class="app-hero-actions" id="hero-actions"></div>
+    </div>
+  </div>
+</section>
+
+<!-- Screenshots -->
+<div id="screenshots-section" class="screenshots-section" style="display:none">
+  <div class="screenshots-inner">
+    <h3 data-i18n="app.screenshots" style="margin-bottom:.75rem">Capturas de pantalla</h3>
+    <div class="screenshots-scroll" id="screenshots-scroll"></div>
+  </div>
+</div>
+
+<!-- Detail grid -->
+<div class="detail-grid" id="detail-grid" style="display:none">
+  <!-- Description -->
+  <div>
+    <div class="detail-card">
+      <h3 data-i18n="app.description">Descripción</h3>
+      <div class="detail-description" id="app-description"></div>
+    </div>
+  </div>
+  <!-- Sidebar -->
+  <div>
+    <div class="detail-card" id="tech-card">
+      <h3 data-i18n="app.details">Detalles técnicos</h3>
+      <div id="tech-rows"></div>
+    </div>
+    <div class="detail-card mt-2" id="icons-card" style="display:none">
+      <h3>🎨 <span data-i18n="app.download_icons">Descargar iconos</span></h3>
+      <p class="text-muted mt-1" style="font-size:.82rem">Favicon, Apple Touch Icon, PWA icons y manifest.json</p>
+      <div class="icons-grid" id="icons-preview"></div>
+      <a id="icons-download-btn" class="btn btn-primary w-full mt-2" target="_blank">⬇ <span data-i18n="app.download_icons">Descargar iconos</span></a>
+    </div>
+  </div>
+</div>
+
+<!-- Lightbox -->
+<div id="lightbox" class="lightbox" style="display:none">
+  <button class="lightbox-close" onclick="closeLightbox()">✕</button>
+  <img id="lightbox-img" src="" alt="Screenshot"/>
+</div>
+
+<footer class="footer"><p>© 2025 WAppStore — <a href="/">← <span data-i18n="nav.store">Tienda</span></a></p></footer>
+
+<script src="/js/i18n.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/nav.js"></script>
+<script>
+const t   = k => I18N.t(k);
+const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const slug = new URLSearchParams(location.search).get('slug');
+
+if (!slug) { document.body.innerHTML = '<div class="empty-state"><div class="empty-icon">🚫</div><h3>App no encontrada</h3></div>'; }
+
+async function loadApp() {
+  const app = await API.getApp(slug, I18N.lang).catch(() => null);
+  if (!app) {
+    document.getElementById('app-hero').innerHTML = '<div class="empty-state" style="padding:4rem"><div class="empty-icon">🚫</div><h3>App no encontrada</h3><a class="btn btn-primary mt-2" href="/">Volver a la tienda</a></div>';
+    return;
+  }
+  document.title = `${app.name} — WAppStore`;
+
+  // Logo
+  const logoEl = document.getElementById('hero-logo');
+  if (app.logo_url) {
+    logoEl.outerHTML = `<img id="hero-logo" class="app-hero-logo" src="${app.logo_url}" alt="${esc(app.name)}"/>`;
+  } else {
+    logoEl.textContent = app.category?.icon || '📦';
+  }
+
+  // Name
+  document.getElementById('hero-name').textContent = app.name;
+
+  // Meta
+  const meta = document.getElementById('hero-meta');
+  const catName = app.category ? `${app.category.icon||''} ${I18N.lang==='en'?app.category.name_en:app.category.name_es}` : '';
+  const platform = app.platform ? `<span class="platform-badge">${app.platform.toUpperCase()}</span>` : '';
+  const featured = app.featured ? `<span class="featured-badge">⭐ Destacada</span>` : '';
+  const devName  = app.developer?.name ? `<span class="text-muted">por ${esc(app.developer.name)}</span>` : '';
+  meta.innerHTML = `
+    ${catName ? `<span class="cat-badge">${catName}</span>` : ''}
+    ${platform} ${featured} ${devName}
+    ${app.version ? `<span class="text-muted text-small">v${esc(app.version)}</span>` : ''}
+  `;
+
+  // Actions
+  const actions = document.getElementById('hero-actions');
+  let actHtml = `<a href="${esc(app.url)}" target="_blank" rel="noopener" class="btn btn-primary btn-lg">🔗 ${t('app.visit')}</a>`;
+  if (app.contact_email) actHtml += `<a href="mailto:${esc(app.contact_email)}" class="btn btn-ghost">${t('app.contact')}</a>`;
+  if (app.icons_zip_url && Auth.hasRole('developer','admin')) actHtml += `<a href="/api/upload/icons/${app.id}/download" class="btn btn-outline">📦 ${t('app.download_icons')}</a>`;
+  actions.innerHTML = actHtml;
+
+  // Description
+  const desc = I18N.lang==='en' ? (app.description_en||app.description_es||'') : (app.description_es||app.description_en||'');
+  document.getElementById('app-description').textContent = desc;
+  document.getElementById('detail-grid').style.display = '';
+
+  // Tech details
+  const rows = [
+    ['app.version', app.version],
+    ['app.platform', app.platform],
+    ['app.languages', app.languages?.join(', ')],
+    ['app.tags',      app.tags?.join(', ')],
+    ['app.pwa',       app.pwa_installable ? t('app.yes') : t('app.no')],
+    ['app.offline',   app.has_offline     ? t('app.yes') : t('app.no')],
+    app.contact_email ? ['app.contact', `<a href="mailto:${esc(app.contact_email)}">${esc(app.contact_email)}</a>`] : null,
+    app.privacy_url   ? ['app.privacy',  `<a href="${esc(app.privacy_url)}" target="_blank">🔗 Link</a>`] : null,
+    app.terms_url     ? ['app.terms',    `<a href="${esc(app.terms_url)}" target="_blank">🔗 Link</a>`] : null,
+    app.source_url    ? ['app.source',   `<a href="${esc(app.source_url)}" target="_blank">🔗 Link</a>`] : null,
+    app.size_kb       ? ['app.version',  `${app.size_kb} KB`] : null,
+  ].filter(Boolean);
+
+  document.getElementById('tech-rows').innerHTML = rows.map(([k,v]) =>
+    `<div class="tech-row"><span class="label">${t(k)}</span><span class="value">${v||'—'}</span></div>`
+  ).join('');
+
+  // Tags cloud
+  if (app.tags?.length) {
+    document.getElementById('tech-card').innerHTML += `
+      <div class="tags-list mt-2">
+        ${app.tags.map(tg=>`<span class="tag">${esc(tg)}</span>`).join('')}
+      </div>`;
+  }
+
+  // Screenshots
+  if (app.screenshots?.length) {
+    document.getElementById('screenshots-section').style.display = '';
+    document.getElementById('screenshots-scroll').innerHTML = app.screenshots.map(ss =>
+      `<div class="screenshot-item" onclick="openLightbox('${esc(ss.url)}')">
+         <img src="${esc(ss.url)}" alt="Screenshot" loading="lazy"/>
+       </div>`
+    ).join('');
+  }
+
+  // Icons — solo visible para developer y admin
+  if (app.icons?.length && Auth.hasRole('developer','admin')) {
+    const card = document.getElementById('icons-card');
+    card.style.display = '';
+    const preview = document.getElementById('icons-preview');
+    const showSizes = [16,32,180,192,512];
+    preview.innerHTML = app.icons.filter(i=>showSizes.includes(i.size)).map(i =>
+      `<div class="icon-item">
+         <img src="${esc(i.url)}" alt="${esc(i.icon_type)}" loading="lazy"/>
+         <span>${i.size||'ico'}px</span>
+       </div>`
+    ).join('');
+    if (app.icons_zip_url) {
+      document.getElementById('icons-download-btn').href = app.icons_zip_url;
+    }
+  }
+}
+
+function openLightbox(src)  { document.getElementById('lightbox').style.display='flex'; document.getElementById('lightbox-img').src=src; }
+function closeLightbox()    { document.getElementById('lightbox').style.display='none'; }
+document.getElementById('lightbox').addEventListener('click', e => { if (e.target===e.currentTarget) closeLightbox(); });
+
+document.addEventListener('langchange', () => loadApp());
+
+if (slug) loadApp();
+</script>
+</body>
+</html>
