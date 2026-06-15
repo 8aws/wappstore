@@ -23,14 +23,14 @@ services:
       # ⚠️ Cambia este secreto:  openssl rand -base64 48
       - JWT_SECRET=CHANGE_ME_openssl_rand_base64_48
       - ADMIN_EMAIL=admin@wappstore.local
-      - ADMIN_PASSWORD=Admin1234!
+      - ADMIN_PASSWORD=CHANGE_ME_set_a_strong_password
       - DB_PATH=/app/data/wappstore.db
     volumes:
       - type: bind
-        source: /media/HSS-Storage/AppData/wappstore/data
+        source: /media/HDD-Storage/AppData/wappstore/data
         target: /app/data
       - type: bind
-        source: /media/HSS-Storage/AppData/wappstore/uploads
+        source: /media/HDD-Storage/AppData/wappstore/uploads
         target: /app/uploads
     x-casaos:
       ports:
