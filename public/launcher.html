@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+  <title>Mi Launcher — WAppStore</title>
+  <link rel="manifest" href="/manifest.json"/>
+  <meta name="theme-color" content="#5B4BD6"/>
+  <link rel="apple-touch-icon" href="/icons/icon-192.png"/>
+  <link rel="icon" type="image/png" href="/icons/favicon-32.png"/>
+  <link rel="stylesheet" href="/css/style.css"/>
+  <style>
+    .launcher-wrap { max-width: 1100px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+    .launcher-head { display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; margin-bottom:1.5rem; }
+    .launcher-head h1 { font-size:1.6rem; margin:0; }
+    .launcher-head p  { color:var(--muted); margin:.25rem 0 0; font-size:.9rem; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:1.25rem; }
+    .tile { position:relative; display:flex; flex-direction:column; align-items:center; gap:.6rem;
+            text-decoration:none; color:var(--text); padding:1rem .5rem; border-radius:var(--radius-lg);
+            transition:transform var(--transition), background var(--transition); }
+    .tile:hover { transform:translateY(-4px); background:var(--surface2); }
+    .tile .ic { width:76px; height:76px; border-radius:20px; object-fit:cover; box-shadow:var(--shadow);
+                background:var(--surface); display:flex; align-items:center; justify-content:center; font-size:2.2rem; }
+    .tile .nm { font-size:.85rem; font-weight:600; text-align:center; line-height:1.2;
+                max-width:110px; overflow:hidden; text-overflow:ellipsis; display:-webkit-box;
+                -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+    .tile .rm { position:absolute; top:.25rem; right:.25rem; width:24px; height:24px; border-radius:50%;
+                border:none; background:var(--error); color:#fff; cursor:pointer; font-size:.8rem; line-height:1;
+                opacity:0; transition:opacity var(--transition); }
+    .tile:hover .rm { opacity:1; }
+    .empty { text-align:center; padding:4rem 1rem; color:var(--muted); }
+    .empty .big { font-size:3rem; margin-bottom:1rem; }
+  </style>
+</head>
+<body>
+<nav class="nav" id="main-nav"></nav>
+
+<div class="launcher-wrap">
+  <div class="launcher-head">
+    <div>
+      <h1>🚀 Mi Launcher</h1>
+      <p>Tus apps guardadas, a un toque. Instálalo como app desde el navegador.</p>
+    </div>
+    <div style="display:flex; gap:.5rem;">
+      <button id="install-btn" class="btn btn-outline btn-sm" style="display:none">⬇ Instalar</button>
+      <a href="/" class="btn btn-primary btn-sm">＋ Añadir apps</a>
+    </div>
+  </div>
+  <div id="launcher-body"></div>
+</div>
+
+<script src="/js/i18n.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/nav.js"></script>
+<script>
+const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const body = document.getElementById('launcher-body');
+
+async function render() {
+  if (!Auth.isLoggedIn()) {
+    body.innerHTML = `<div class="empty"><div class="big">🔒</div>
+      <h3>Inicia sesión para usar tu launcher</h3>
+      <p>Guarda los enlaces de las apps que adquieras y lánzalas desde aquí.</p>
+      <a class="btn btn-primary mt-2" href="/login.html">Iniciar sesión</a></div>`;
+    return;
+  }
+  let apps;
+  try { apps = await API.getLibrary(); }
+  catch { body.innerHTML = `<div class="empty"><div class="big">⚠️</div><h3>No se pudo cargar tu launcher</h3></div>`; return; }
+
+  if (!apps.length) {
+    body.innerHTML = `<div class="empty"><div class="big">📭</div>
+      <h3>Tu launcher está vacío</h3>
+      <p>Explora la tienda y pulsa “➕ Añadir a mi launcher” en cualquier app.</p>
+      <a class="btn btn-primary mt-2" href="/">Explorar la tienda</a></div>`;
+    return;
+  }
+
+  body.innerHTML = `<div class="grid">${apps.map(a => `
+    <a class="tile" href="${esc(a.url)}" target="_blank" rel="noopener noreferrer" title="${esc(a.name)}">
+      <button class="rm" data-id="${a.id}" title="Quitar">✕</button>
+      ${a.logo_url
+        ? `<img class="ic" src="${esc(a.logo_url)}" alt="${esc(a.name)}"/>`
+        : `<span class="ic">📦</span>`}
+      <span class="nm">${esc(a.name)}</span>
+    </a>`).join('')}</div>`;
+
+  body.querySelectorAll('.rm').forEach(btn => btn.addEventListener('click', async e => {
+    e.preventDefault(); e.stopPropagation();
+    const id = btn.dataset.id;
+    try { await API.removeFromLibrary(id); toast.success('Quitada del launcher'); render(); }
+    catch (err) { toast.error(err.message || 'Error'); }
+  }));
+}
+
+// Prompt de instalación PWA
+let deferredPrompt = null;
+const installBtn = document.getElementById('install-btn');
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredPrompt = e; installBtn.style.display=''; });
+installBtn.addEventListener('click', async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  await deferredPrompt.userChoice;
+  deferredPrompt = null; installBtn.style.display='none';
+});
+
+render();
+</script>
+</body>
+</html>

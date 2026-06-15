@@ -27,10 +27,10 @@ services:
       - DB_PATH=/app/data/wappstore.db
     volumes:
       - type: bind
-        source: /DATA/AppData/wappstore/data
+        source: /media/HSS-Storage/AppData/wappstore/data
         target: /app/data
       - type: bind
-        source: /DATA/AppData/wappstore/uploads
+        source: /media/HSS-Storage/AppData/wappstore/uploads
         target: /app/uploads
     x-casaos:
       ports:
@@ -77,7 +77,7 @@ x-casaos:
   description:
     en_us: Catalog, admin panel, developer dashboard and clients for PWAs and WebApps.
     es_es: Catálogo, panel de administración, panel de desarrollador y clientes para PWAs y WebApps.
-  icon: https://github.com/8aws.png
+  icon: https://raw.githubusercontent.com/8aws/wappstore/main/public/icons/icon-512.png
   thumbnail: ""
   screenshot_link: []
   scheme: http

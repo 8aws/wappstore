@@ -21,6 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
     <div class="nav-actions">
       ${user ? `
         <span class="nav-user"><strong>${escHtml(user.name)}</strong></span>
+        <a href="/launcher.html" class="btn btn-ghost btn-sm">🚀 Launcher</a>
         ${isDev   ? `<a href="/dashboard.html" class="btn btn-ghost btn-sm">${t('nav.dashboard')}</a>` : ''}
         ${isAdmin ? `<a href="/admin.html"     class="btn btn-ghost btn-sm">${t('nav.admin')}</a>` : ''}
         <button onclick="doLogout()" class="btn btn-ghost btn-sm">${t('nav.logout')}</button>

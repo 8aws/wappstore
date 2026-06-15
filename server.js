@@ -5,7 +5,19 @@ const fs      = require('fs');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
-global.JWT_SECRET = process.env.JWT_SECRET || 'wappstore-dev-secret-change-in-prod';
+
+// ── JWT secret ─────────────────────────────────────────────────────────────
+const DEV_SECRET = 'wappstore-dev-secret-change-in-prod';
+global.JWT_SECRET = process.env.JWT_SECRET || DEV_SECRET;
+if (process.env.NODE_ENV === 'production' &&
+    (!process.env.JWT_SECRET || process.env.JWT_SECRET === DEV_SECRET)) {
+  console.error('❌ JWT_SECRET no configurado en producción. Genéralo con: openssl rand -base64 48');
+  process.exit(1);
+}
+if (process.env.NODE_ENV === 'production' &&
+    (!process.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD === 'Admin1234!')) {
+  console.warn('⚠️  ADMIN_PASSWORD usa el valor por defecto. Cámbialo cuanto antes.');
+}
 
 // ── Directories ────────────────────────────────────────────────────────────
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
@@ -19,6 +31,9 @@ const { initDb } = require('./src/database');
 initDb();
 
 // ── Middleware ─────────────────────────────────────────────────────────────
+const { securityHeaders } = require('./src/middleware/security');
+app.set('trust proxy', 1); // detrás del reverse proxy de ZimaOS / Cosmos
+app.use(securityHeaders);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -29,6 +44,7 @@ app.use('/uploads', express.static(UPLOAD_DIR));
 // ── API Routes ─────────────────────────────────────────────────────────────
 app.use('/api/public',    require('./src/routes/public'));
 app.use('/api/auth',      require('./src/routes/auth'));
+app.use('/api/me',        require('./src/routes/me'));
 app.use('/api/developer', require('./src/routes/developer'));
 app.use('/api/admin',     require('./src/routes/admin'));
 app.use('/api/upload',    require('./src/routes/upload'));

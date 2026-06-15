@@ -52,6 +52,11 @@ window.API = (() => {
     login:    (email, pw) => req('POST', '/api/auth/login',    { email, password: pw }),
     register: (d)         => req('POST', '/api/auth/register', d),
     me:       ()          => req('GET',  '/api/auth/me'),
+    // Launcher / biblioteca personal
+    getLibrary:      ()      => req('GET',    '/api/me/library'),
+    addToLibrary:    (appId) => req('POST',   '/api/me/library', { app_id: appId }),
+    removeFromLibrary:(appId)=> req('DELETE', `/api/me/library/${appId}`),
+    reorderLibrary:  (order) => req('PUT',    '/api/me/library/reorder', { order }),
     // Developer
     myApps:       ()    => req('GET',    '/api/developer/apps'),
     myApp:        (id)  => req('GET',    `/api/developer/apps/${id}`),
@@ -104,3 +109,10 @@ window.toast = (() => {
     info:    (m, ms) => window.toast.show(m, 'info', ms),
   };
 })();
+
+/* ── Service worker (PWA instalable) ────────────────────────────────────── */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}

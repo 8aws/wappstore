@@ -105,9 +105,20 @@ async function loadApp() {
   // Actions
   const actions = document.getElementById('hero-actions');
   let actHtml = `<a href="${esc(app.url)}" target="_blank" rel="noopener" class="btn btn-primary btn-lg">🔗 ${t('app.visit')}</a>`;
+  if (Auth.isLoggedIn()) actHtml += `<button id="add-launcher" class="btn btn-outline" data-id="${app.id}">➕ Añadir a mi launcher</button>`;
   if (app.contact_email) actHtml += `<a href="mailto:${esc(app.contact_email)}" class="btn btn-ghost">${t('app.contact')}</a>`;
   if (app.icons_zip_url && Auth.hasRole('developer','admin')) actHtml += `<a href="/api/upload/icons/${app.id}/download" class="btn btn-outline">📦 ${t('app.download_icons')}</a>`;
   actions.innerHTML = actHtml;
+
+  const addBtn = document.getElementById('add-launcher');
+  if (addBtn) addBtn.addEventListener('click', async () => {
+    addBtn.disabled = true;
+    try {
+      await API.addToLibrary(addBtn.dataset.id);
+      addBtn.textContent = '✓ En tu launcher';
+      toast.success('Añadida a tu launcher');
+    } catch (err) { addBtn.disabled = false; toast.error(err.message || 'Error'); }
+  });
 
   // Description
   const desc = I18N.lang==='en' ? (app.description_en||app.description_es||'') : (app.description_es||app.description_en||'');

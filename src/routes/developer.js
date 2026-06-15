@@ -2,8 +2,20 @@
 const router = require('express').Router();
 const { getDb } = require('../database');
 const { requireAuth } = require('../middleware/auth');
+const { isHttpUrl } = require('../utils/validate');
 
 router.use(requireAuth(['developer', 'admin']));
+
+// Valida que los campos URL presentes sean http(s). Devuelve mensaje de error o null.
+function badUrls(body) {
+  const fields = ['url', 'privacy_url', 'terms_url', 'source_url'];
+  for (const f of fields) {
+    if (body[f] != null && body[f] !== '' && !isHttpUrl(body[f])) {
+      return `Invalid ${f}: must be a valid http(s) URL`;
+    }
+  }
+  return null;
+}
 
 function slugify(text) {
   return text.toLowerCase().replace(/[^a-z0-9\s-]/g,'').replace(/[\s_-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,80);
@@ -43,6 +55,8 @@ router.post('/apps', (req, res) => {
           size_kb, privacy_url, terms_url, source_url, pwa_installable, has_offline } = req.body;
 
   if (!name || !url) return res.status(400).json({ error: 'Name and URL are required' });
+  const urlErr = badUrls(req.body);
+  if (urlErr) return res.status(400).json({ error: urlErr });
 
   let slug = slugify(name);
   if (db.prepare('SELECT id FROM apps WHERE slug=?').get(slug)) slug += '-' + Date.now();
@@ -66,6 +80,9 @@ router.put('/apps/:id', (req, res) => {
   const db  = getDb();
   const app = db.prepare('SELECT id FROM apps WHERE id=? AND developer_id=?').get(req.params.id, req.user.id);
   if (!app) return res.status(404).json({ error: 'App not found' });
+
+  const urlErr = badUrls(req.body);
+  if (urlErr) return res.status(400).json({ error: urlErr });
 
   const f = req.body;
   db.prepare(`

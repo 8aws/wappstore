@@ -2,8 +2,18 @@
 const router = require('express').Router();
 const { getDb } = require('../database');
 const { requireAuth } = require('../middleware/auth');
+const { isHttpUrl } = require('../utils/validate');
 
 router.use(requireAuth(['admin']));
+
+function badUrls(body) {
+  for (const f of ['url', 'privacy_url', 'terms_url', 'source_url']) {
+    if (body[f] != null && body[f] !== '' && !isHttpUrl(body[f])) {
+      return `Invalid ${f}: must be a valid http(s) URL`;
+    }
+  }
+  return null;
+}
 
 function parseTags(v) {
   if (!v) return null;
@@ -55,6 +65,8 @@ router.put('/apps/:id/featured', (req, res) => {
 
 router.put('/apps/:id', (req, res) => {
   const db = getDb();
+  const urlErr = badUrls(req.body);
+  if (urlErr) return res.status(400).json({ error: urlErr });
   const f  = req.body;
   db.prepare(`
     UPDATE apps SET

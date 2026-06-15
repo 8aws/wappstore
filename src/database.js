@@ -90,10 +90,20 @@ function initDb() {
       size      INTEGER
     );
 
+    CREATE TABLE IF NOT EXISTS library (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      app_id     INTEGER NOT NULL REFERENCES apps(id)  ON DELETE CASCADE,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      added_at   TEXT    NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(user_id, app_id)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_apps_status    ON apps(status);
     CREATE INDEX IF NOT EXISTS idx_apps_category  ON apps(category_id);
     CREATE INDEX IF NOT EXISTS idx_apps_developer ON apps(developer_id);
     CREATE INDEX IF NOT EXISTS idx_apps_featured  ON apps(featured);
+    CREATE INDEX IF NOT EXISTS idx_library_user   ON library(user_id);
   `);
 
   // Seed categories
