@@ -2,7 +2,7 @@
 const router = require('express').Router();
 const { getDb } = require('../database');
 const { requireAuth } = require('../middleware/auth');
-const { isHttpUrl } = require('../utils/validate');
+const { isHttpUrl, assertPublicUrl } = require('../utils/validate');
 
 router.use(requireAuth(['developer', 'admin']));
 
@@ -25,6 +25,51 @@ function parseTags(v) {
   if (Array.isArray(v)) return JSON.stringify(v.map(t=>t.trim()).filter(Boolean));
   return JSON.stringify(v.split(',').map(t=>t.trim()).filter(Boolean));
 }
+
+// POST /api/developer/import-manifest { url } — lee el manifest PWA de una URL
+router.post('/import-manifest', async (req, res) => {
+  try {
+    const target = await assertPublicUrl(req.body.url || '');
+    const fetchText = async (u) => {
+      const r = await fetch(u, { redirect: 'follow', signal: AbortSignal.timeout(10000),
+        headers: { 'User-Agent': 'WAppStore-Importer' } });
+      if (!r.ok) throw new Error(`HTTP ${r.status} al leer ${u}`);
+      return { text: await r.text(), type: r.headers.get('content-type') || '', url: r.url };
+    };
+
+    let manifest, manifestUrl;
+    const first = await fetchText(target);
+    if (first.type.includes('json') || first.text.trim().startsWith('{')) {
+      manifest = JSON.parse(first.text); manifestUrl = first.url;
+    } else {
+      const m = first.text.match(/<link[^>]+rel=["'][^"']*manifest[^"']*["'][^>]*>/i);
+      const href = m && m[0].match(/href=["']([^"']+)["']/i);
+      if (!href) return res.status(404).json({ error: 'No se encontró manifest en la página' });
+      manifestUrl = new URL(href[1], first.url).toString();
+      await assertPublicUrl(manifestUrl);
+      manifest = JSON.parse((await fetchText(manifestUrl)).text);
+    }
+
+    const icons = (manifest.icons || []).map(i => ({
+      src: i.src ? new URL(i.src, manifestUrl).toString() : null,
+      sizes: i.sizes || '', type: i.type || '', purpose: i.purpose || '',
+    })).filter(i => i.src);
+    const score = i => (parseInt((i.sizes.split('x')[0]) || 0, 10)) + (i.purpose.includes('any') ? 1 : 0);
+    const best = icons.slice().sort((a, b) => score(b) - score(a))[0];
+
+    res.json({
+      name: manifest.name || manifest.short_name || '',
+      short_desc: manifest.description || '',
+      description: manifest.description || '',
+      theme_color: manifest.theme_color || '',
+      background_color: manifest.background_color || '',
+      start_url: manifest.start_url ? new URL(manifest.start_url, manifestUrl).toString() : target,
+      icons, best_icon_url: best ? best.src : null, manifest_url: manifestUrl,
+    });
+  } catch (e) {
+    res.status(400).json({ error: e.message || 'No se pudo leer el manifest' });
+  }
+});
 
 // GET /api/developer/apps
 router.get('/apps', (req, res) => {

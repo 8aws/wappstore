@@ -112,4 +112,6 @@ del origen al destino; la DB se migra sola al arrancar.)
 | ADMIN_PASSWORD  | Admin1234!               | Contraseña del admin inicial   |
 | ADMIN_RESET     | (sin definir)            | =1 restablece la pass del admin en el arranque |
 | NODE_ENV        | (sin definir)            | =production exige un JWT_SECRET propio |
+| BACKUP_INTERVAL_HOURS | 24                 | Cada cuántas horas se hace backup automático (0 lo desactiva) |
+| BACKUP_KEEP     | 7                        | Nº de backups automáticos a conservar |
 | DB_PATH         | ./data/wappstore.db      | Ruta de la base de datos       |

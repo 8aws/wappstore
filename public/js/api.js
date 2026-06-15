@@ -67,6 +67,22 @@ window.API = (() => {
     createFolder:  (name, icon) => req('POST', '/api/me/folders', { name, icon }),
     updateFolder:  (id, d) => req('PUT',    `/api/me/folders/${id}`, d),
     deleteFolder:  (id)    => req('DELETE', `/api/me/folders/${id}`),
+    reorderFolders:(order) => req('PUT',    '/api/me/folders/reorder', { order }),
+    // Reseñas
+    getMyReview:   (appId) => req('GET',    `/api/me/reviews/${appId}`),
+    saveReview:    (d)     => req('POST',   '/api/me/reviews', d),
+    deleteReview:  (appId) => req('DELETE', `/api/me/reviews/${appId}`),
+    // Importar desde manifest PWA
+    importManifest:(url)   => req('POST',   '/api/developer/import-manifest', { url }),
+    logoFromUrl:   (appId, url) => req('POST', `/api/upload/logo-url/${appId}`, { url }),
+    // Admin extra
+    adminResetPassword: (id, pw) => req('PUT', `/api/admin/users/${id}/password`, { new_password: pw }),
+    adminRestore:  (fd)    => req('POST', '/api/admin/restore', fd, true),
+    adminBackupBlob: async () => {
+      const r = await fetch('/api/admin/backup', { headers: { Authorization: `Bearer ${Auth.getToken()}` } });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.blob();
+    },
     // Developer
     myApps:       ()    => req('GET',    '/api/developer/apps'),
     myApp:        (id)  => req('GET',    `/api/developer/apps/${id}`),

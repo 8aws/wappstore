@@ -62,6 +62,15 @@ router.post('/folders', (req, res) => {
   res.status(201).json(db.prepare('SELECT id,name,icon,sort_order FROM launcher_folders WHERE id=?').get(r.lastInsertRowid));
 });
 
+// PUT /api/me/folders/reorder { order: [folderId, ...] }  (antes que /:id)
+router.put('/folders/reorder', (req, res) => {
+  const order = Array.isArray(req.body.order) ? req.body.order : [];
+  const db = getDb();
+  const stmt = db.prepare('UPDATE launcher_folders SET sort_order=? WHERE user_id=? AND id=?');
+  db.transaction(ids => ids.forEach((id, i) => stmt.run(i, req.user.id, parseInt(id, 10))))(order);
+  res.json({ success: true });
+});
+
 // PUT /api/me/folders/:id { name, icon, sort_order }
 router.put('/folders/:id', (req, res) => {
   const db = getDb();
@@ -133,6 +142,37 @@ router.put('/library/:appId/folder', (req, res) => {
   const r = db.prepare('UPDATE library SET folder_id=? WHERE user_id=? AND app_id=?')
               .run(folderId, req.user.id, parseInt(req.params.appId, 10));
   if (!r.changes) return res.status(404).json({ error: 'App not in library' });
+  res.json({ success: true });
+});
+
+/* ── Reseñas / valoraciones ───────────────────────────────────────────────*/
+// GET /api/me/reviews/:appId — mi reseña de una app (para precargar)
+router.get('/reviews/:appId', (req, res) => {
+  const r = getDb().prepare('SELECT id,rating,comment FROM reviews WHERE app_id=? AND user_id=?')
+              .get(parseInt(req.params.appId, 10), req.user.id);
+  res.json(r || null);
+});
+
+// POST /api/me/reviews { app_id, rating, comment } — crea o actualiza
+router.post('/reviews', (req, res) => {
+  const db     = getDb();
+  const appId  = parseInt(req.body.app_id, 10);
+  const rating = parseInt(req.body.rating, 10);
+  const comment = (req.body.comment || '').toString().slice(0, 2000);
+  if (!appId || !(rating >= 1 && rating <= 5)) return res.status(400).json({ error: 'app_id and rating (1-5) required' });
+  if (!db.prepare("SELECT id FROM apps WHERE id=? AND status='approved'").get(appId))
+    return res.status(404).json({ error: 'App not found or not approved' });
+
+  db.prepare(`
+    INSERT INTO reviews(app_id,user_id,rating,comment) VALUES(?,?,?,?)
+    ON CONFLICT(app_id,user_id) DO UPDATE SET rating=excluded.rating, comment=excluded.comment, created_at=datetime('now')
+  `).run(appId, req.user.id, rating, comment);
+  res.status(201).json({ success: true });
+});
+
+// DELETE /api/me/reviews/:appId
+router.delete('/reviews/:appId', (req, res) => {
+  getDb().prepare('DELETE FROM reviews WHERE app_id=? AND user_id=?').run(parseInt(req.params.appId, 10), req.user.id);
   res.json({ success: true });
 });
 

@@ -24,6 +24,8 @@
     .folder-head .sp  { flex:1; }
     .folder-head button { border:none; background:transparent; cursor:pointer; font-size:.95rem; opacity:.6; padding:.15rem .3rem; border-radius:6px; }
     .folder-head button:hover { opacity:1; background:var(--surface2); }
+    .folder-head button:disabled { opacity:.2; cursor:default; background:transparent; }
+    .folder-head .caret { font-size:.8rem; opacity:.8; }
 
     .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:1.25rem; min-height:40px; }
     .tile { position:relative; display:flex; flex-direction:column; align-items:center; gap:.6rem;
@@ -57,13 +59,13 @@
 <div class="launcher-wrap">
   <div class="launcher-head">
     <div>
-      <h1>🚀 Mi Launcher</h1>
-      <p>Arrastra para reordenar o mover a carpetas. Instálalo como app desde el navegador.</p>
+      <h1>🚀 <span data-i18n="launcher.title">Mi Launcher</span></h1>
+      <p data-i18n="launcher.subtitle">Arrastra para reordenar o mover a carpetas. Instálalo como app desde el navegador.</p>
     </div>
     <div class="toolbar">
-      <button id="new-folder" class="btn btn-ghost btn-sm">📁 Nueva carpeta</button>
-      <button id="install-btn" class="btn btn-outline btn-sm" style="display:none">⬇ Instalar</button>
-      <a href="/" class="btn btn-primary btn-sm">＋ Añadir apps</a>
+      <button id="new-folder" class="btn btn-ghost btn-sm">📁 <span data-i18n="launcher.new_folder">Nueva carpeta</span></button>
+      <button id="install-btn" class="btn btn-outline btn-sm" style="display:none">⬇ <span data-i18n="launcher.install">Instalar</span></button>
+      <a href="/" class="btn btn-primary btn-sm">＋ <span data-i18n="launcher.add_apps">Añadir apps</span></a>
     </div>
   </div>
   <div id="launcher-body"></div>
@@ -74,6 +76,7 @@
 <script src="/js/nav.js"></script>
 <script>
 const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const L = k => I18N.t(k);
 const body = document.getElementById('launcher-body');
 const state = { apps: [], folders: [] };
 let draggedId = null;
@@ -81,9 +84,8 @@ let draggedId = null;
 async function load() {
   if (!Auth.isLoggedIn()) {
     body.innerHTML = `<div class="empty"><div class="big">🔒</div>
-      <h3>Inicia sesión para usar tu launcher</h3>
-      <p>Guarda los enlaces de las apps que adquieras y lánzalas desde aquí.</p>
-      <a class="btn btn-primary mt-2" href="/login.html">Iniciar sesión</a></div>`;
+      <h3>${L('launcher.login_title')}</h3>
+      <a class="btn btn-primary mt-2" href="/login.html">${I18N.t('nav.login')}</a></div>`;
     document.getElementById('new-folder').style.display = 'none';
     return;
   }
@@ -105,31 +107,40 @@ function tileHtml(a) {
     </a>`;
 }
 
-function sectionHtml(folder, apps) {
+function isCollapsed(fid) { return localStorage.getItem('wlf_collapsed_' + fid) === '1'; }
+function toggleCollapsed(fid) { localStorage.setItem('wlf_collapsed_' + fid, isCollapsed(fid) ? '0' : '1'); }
+
+function sectionHtml(folder, apps, idx, total) {
   const fid = folder ? folder.id : '';
+  const collapsed = folder && isCollapsed(fid);
   const head = folder
     ? `<div class="folder-head" data-folder="${fid}">
+         <button class="caret" data-col="${fid}" title="Plegar/desplegar">${collapsed ? '▸' : '▾'}</button>
          <span>${esc(folder.icon||'📁')}</span><span class="ttl">${esc(folder.name)}</span>
          <span class="cnt">${apps.length}</span><span class="sp"></span>
+         <button data-up="${fid}" title="Subir" ${idx === 0 ? 'disabled' : ''}>↑</button>
+         <button data-down="${fid}" title="Bajar" ${idx === total - 1 ? 'disabled' : ''}>↓</button>
          <button data-ren="${fid}" title="Renombrar">✎</button>
          <button data-del="${fid}" title="Eliminar carpeta">🗑</button>
        </div>`
-    : `<div class="folder-head" data-folder=""><span>🗂️</span><span class="ttl">Sin carpeta</span><span class="cnt">${apps.length}</span></div>`;
-  return `<section class="folder-section" data-drop="${fid}">${head}
-      <div class="grid">${apps.map(tileHtml).join('') || '<p class="text-muted" style="padding:.5rem">Arrastra apps aquí…</p>'}</div>
-    </section>`;
+    : `<div class="folder-head" data-folder=""><span>🗂️</span><span class="ttl">${L('launcher.no_folder')}</span><span class="cnt">${apps.length}</span></div>`;
+  const grid = (folder && collapsed)
+    ? ''
+    : `<div class="grid">${apps.map(tileHtml).join('') || `<p class="text-muted" style="padding:.5rem">${L('launcher.drop_here')}</p>`}</div>`;
+  return `<section class="folder-section" data-drop="${fid}">${head}${grid}</section>`;
 }
 
 function render() {
   if (!state.apps.length && !state.folders.length) {
     body.innerHTML = `<div class="empty"><div class="big">📭</div>
-      <h3>Tu launcher está vacío</h3>
-      <p>Explora la tienda y pulsa “➕ Añadir a mi launcher” en cualquier app.</p>
-      <a class="btn btn-primary mt-2" href="/">Explorar la tienda</a></div>`;
+      <h3>${L('launcher.empty_title')}</h3>
+      <p>${L('launcher.empty_hint')}</p>
+      <a class="btn btn-primary mt-2" href="/">${L('launcher.explore')}</a></div>`;
     return;
   }
   const byFolder = id => state.apps.filter(a => (a.folder_id ?? null) === id);
-  let html = state.folders.map(f => sectionHtml(f, byFolder(f.id))).join('');
+  const n = state.folders.length;
+  let html = state.folders.map((f, i) => sectionHtml(f, byFolder(f.id), i, n)).join('');
   html += sectionHtml(null, byFolder(null));   // sin carpeta al final
   body.innerHTML = html;
   wire();
@@ -150,7 +161,7 @@ function wire() {
   });
   body.querySelectorAll('[data-rm]').forEach(b => b.addEventListener('click', async e => {
     e.preventDefault(); e.stopPropagation();
-    try { await API.removeFromLibrary(b.dataset.rm); state.apps = state.apps.filter(a=>a.id!=b.dataset.rm); render(); toast.success('Quitada'); }
+    try { await API.removeFromLibrary(b.dataset.rm); state.apps = state.apps.filter(a=>a.id!=b.dataset.rm); render(); toast.success(L('launcher.removed')); }
     catch (err) { toast.error(err.message||'Error'); }
   }));
   body.querySelectorAll('[data-mv]').forEach(b => b.addEventListener('click', e => {
@@ -158,6 +169,18 @@ function wire() {
   }));
   body.querySelectorAll('[data-ren]').forEach(b => b.addEventListener('click', () => renameFolder(+b.dataset.ren)));
   body.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => deleteFolder(+b.dataset.del)));
+  body.querySelectorAll('[data-col]').forEach(b => b.addEventListener('click', () => { toggleCollapsed(+b.dataset.col); render(); }));
+  body.querySelectorAll('[data-up]').forEach(b => b.addEventListener('click', () => moveFolder(+b.dataset.up, -1)));
+  body.querySelectorAll('[data-down]').forEach(b => b.addEventListener('click', () => moveFolder(+b.dataset.down, +1)));
+}
+
+async function moveFolder(id, dir) {
+  const i = state.folders.findIndex(f => f.id === id);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= state.folders.length) return;
+  [state.folders[i], state.folders[j]] = [state.folders[j], state.folders[i]];
+  render();
+  try { await API.reorderFolders(state.folders.map(f => f.id)); } catch {}
 }
 
 async function persistOrder() { try { await API.reorderLibrary(state.apps.map(a=>a.id)); } catch {} }
@@ -234,6 +257,8 @@ installBtn.addEventListener('click', async () => {
   deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt = null; installBtn.style.display='none';
 });
 
+I18N.applyAll();
+document.addEventListener('langchange', () => { I18N.applyAll(); render(); });
 load();
 </script>
 </body>

@@ -39,6 +39,16 @@
       <div style="max-width:820px">
         <form id="app-form" autocomplete="off">
           <input type="hidden" id="edit-id"/>
+          <!-- Auto-rellenar desde manifest PWA -->
+          <div class="detail-card" style="margin-bottom:1rem;border:1px dashed var(--primary)">
+            <h3 style="margin-bottom:.5rem">🪄 Importar desde una PWA</h3>
+            <p class="text-muted text-small" style="margin-bottom:.75rem">Pega la URL de una web/PWA y rellenamos el formulario leyendo su <code>manifest.json</code> (nombre, descripción, icono, colores).</p>
+            <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+              <input id="import-url" type="url" placeholder="https://tuapp.example.com" style="flex:1;min-width:240px"/>
+              <button type="button" class="btn btn-primary" id="import-btn">Importar</button>
+            </div>
+            <div id="import-icon" class="mt-1"></div>
+          </div>
           <!-- Basic -->
           <div class="detail-card" style="margin-bottom:1rem">
             <h3 style="margin-bottom:1rem">Información básica</h3>
@@ -193,6 +203,30 @@ let categories  = [];
 let editingId   = null;
 let logoFile    = null;
 let ssFiles     = [];
+let importedIconUrl = null;
+
+// ── Importar desde manifest PWA ─────────────────────────────────────────────
+document.getElementById('import-btn').addEventListener('click', async () => {
+  const url = document.getElementById('import-url').value.trim();
+  if (!url) return;
+  const btn = document.getElementById('import-btn');
+  btn.disabled = true; btn.textContent = 'Leyendo…';
+  try {
+    const m = await API.importManifest(url);
+    const set = (id, v) => { if (v) document.getElementById(id).value = v; };
+    set('f-name', m.name);
+    set('f-short-es', (m.short_desc || '').slice(0, 160));
+    set('f-desc-es', m.description);
+    if (!document.getElementById('f-url').value) set('f-url', url);
+    document.getElementById('f-pwa').checked = true;
+    importedIconUrl = m.best_icon_url || null;
+    document.getElementById('import-icon').innerHTML = importedIconUrl
+      ? `<div class="flex gap-1" style="align-items:center"><img src="${esc(importedIconUrl)}" style="width:48px;height:48px;border-radius:10px;object-fit:cover;border:1px solid var(--border)"/><span class="text-small text-muted">Icono detectado — se usará como logo al guardar</span></div>`
+      : '<span class="text-small text-muted">Sin icono en el manifest</span>';
+    toast.success('Datos importados del manifest');
+  } catch (e) { toast.error(e.message || 'No se pudo importar'); }
+  finally { btn.disabled = false; btn.textContent = 'Importar'; }
+});
 
 // ── Tabs ──────────────────────────────────────────────────────────────────
 function showTab(name) {
@@ -260,8 +294,9 @@ async function loadCategories() {
 }
 
 function resetForm() {
-  editingId = null; logoFile = null; ssFiles = [];
+  editingId = null; logoFile = null; ssFiles = []; importedIconUrl = null;
   document.getElementById('app-form').reset();
+  document.getElementById('import-icon').innerHTML = '';
   document.getElementById('edit-id').value = '';
   document.getElementById('form-title').textContent = t('dash.new_app');
   document.getElementById('form-submit-btn').textContent = t('form.submit');
@@ -412,12 +447,15 @@ document.getElementById('app-form').addEventListener('submit', async e => {
       toast.success(t('msg.app_submitted'));
     }
 
-    // Upload logo
+    // Upload logo (fichero elegido tiene prioridad; si no, el icono del manifest)
     if (logoFile) {
       btn.textContent = 'Subiendo logo…';
       const fd = new FormData();
       fd.append('logo', logoFile);
       await API.uploadLogo(app.id, fd).catch(ex => toast.error('Logo: ' + ex.message));
+    } else if (importedIconUrl && !editingId) {
+      btn.textContent = 'Descargando icono…';
+      await API.logoFromUrl(app.id, importedIconUrl).catch(ex => toast.error('Icono: ' + ex.message));
     }
 
     // Upload screenshots

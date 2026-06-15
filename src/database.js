@@ -8,6 +8,9 @@ const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'wapps
 fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
 
 let _db = null;
+let _ftsReady = false;
+function ftsReady() { return _ftsReady; }
+
 function getDb() {
   if (!_db) {
     _db = new Database(DB_PATH);
@@ -109,12 +112,52 @@ function initDb() {
       UNIQUE(user_id, app_id)
     );
 
+    CREATE TABLE IF NOT EXISTS reviews (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      app_id     INTEGER NOT NULL REFERENCES apps(id)  ON DELETE CASCADE,
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      rating     INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5),
+      comment    TEXT,
+      created_at TEXT    NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(app_id, user_id)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_apps_status    ON apps(status);
     CREATE INDEX IF NOT EXISTS idx_apps_category  ON apps(category_id);
     CREATE INDEX IF NOT EXISTS idx_apps_developer ON apps(developer_id);
     CREATE INDEX IF NOT EXISTS idx_apps_featured  ON apps(featured);
     CREATE INDEX IF NOT EXISTS idx_library_user   ON library(user_id);
+    CREATE INDEX IF NOT EXISTS idx_reviews_app    ON reviews(app_id);
   `);
+
+  // Búsqueda full-text (FTS5) sobre apps, sincronizada con triggers
+  try {
+    db.exec(`
+      CREATE VIRTUAL TABLE IF NOT EXISTS apps_fts USING fts5(
+        name, short_desc_es, short_desc_en, tags,
+        content='apps', content_rowid='id'
+      );
+      CREATE TRIGGER IF NOT EXISTS apps_fts_ai AFTER INSERT ON apps BEGIN
+        INSERT INTO apps_fts(rowid,name,short_desc_es,short_desc_en,tags)
+        VALUES(new.id,new.name,new.short_desc_es,new.short_desc_en,new.tags);
+      END;
+      CREATE TRIGGER IF NOT EXISTS apps_fts_ad AFTER DELETE ON apps BEGIN
+        INSERT INTO apps_fts(apps_fts,rowid,name,short_desc_es,short_desc_en,tags)
+        VALUES('delete',old.id,old.name,old.short_desc_es,old.short_desc_en,old.tags);
+      END;
+      CREATE TRIGGER IF NOT EXISTS apps_fts_au AFTER UPDATE ON apps BEGIN
+        INSERT INTO apps_fts(apps_fts,rowid,name,short_desc_es,short_desc_en,tags)
+        VALUES('delete',old.id,old.name,old.short_desc_es,old.short_desc_en,old.tags);
+        INSERT INTO apps_fts(rowid,name,short_desc_es,short_desc_en,tags)
+        VALUES(new.id,new.name,new.short_desc_es,new.short_desc_en,new.tags);
+      END;
+    `);
+    db.exec("INSERT INTO apps_fts(apps_fts) VALUES('rebuild');"); // poblar/resincronizar
+    _ftsReady = true;
+  } catch (e) {
+    console.warn('⚠️  FTS5 no disponible, se usará búsqueda LIKE:', e.message);
+    _ftsReady = false;
+  }
 
   // Migración: añadir library.folder_id a DBs creadas antes de v1.3.0
   const libCols = db.prepare('PRAGMA table_info(library)').all().map(c => c.name);
@@ -168,4 +211,21 @@ function initDb() {
   return db;
 }
 
-module.exports = { getDb, initDb };
+// ── Backup / restore ───────────────────────────────────────────────────────
+// Snapshot consistente de la DB a un fichero destino (devuelve promesa).
+function backupTo(dest) { return getDb().backup(dest); }
+
+function closeDb() { if (_db) { try { _db.close(); } catch {} _db = null; } }
+
+// Reemplaza la DB activa por la del fichero src y reabre + migra.
+function restoreFrom(srcFile) {
+  closeDb();
+  for (const ext of ['', '-wal', '-shm']) {
+    const f = DB_PATH + ext;
+    if (fs.existsSync(f)) fs.rmSync(f);
+  }
+  fs.copyFileSync(srcFile, DB_PATH);
+  return initDb();
+}
+
+module.exports = { getDb, initDb, backupTo, restoreFrom, closeDb, ftsReady, DB_PATH };

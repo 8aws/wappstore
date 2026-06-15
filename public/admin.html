@@ -17,6 +17,7 @@
       <li><button onclick="showTab('allapps')"  id="tab-btn-allapps">📦 <span data-i18n="admin.all_apps">Todas las apps</span></button></li>
       <li><button onclick="showTab('cats')"     id="tab-btn-cats">🏷 <span data-i18n="admin.categories">Categorías</span></button></li>
       <li><button onclick="showTab('users')"    id="tab-btn-users">👥 <span data-i18n="admin.users">Usuarios</span></button></li>
+      <li><button onclick="showTab('maint')"    id="tab-btn-maint">🛟 <span data-i18n="admin.maintenance">Mantenimiento</span></button></li>
     </ul>
   </aside>
 
@@ -58,6 +59,24 @@
       <h2 style="margin-bottom:1.5rem">👥 <span data-i18n="admin.users">Usuarios</span></h2>
       <div id="users-list"></div>
     </div>
+
+    <!-- Maintenance -->
+    <div id="tab-maint" style="display:none">
+      <h2 style="margin-bottom:1.5rem">🛟 <span data-i18n="admin.maintenance">Mantenimiento</span></h2>
+      <div class="detail-card" style="margin-bottom:1rem;max-width:640px">
+        <h3>🗄️ <span data-i18n="admin.backup">Copia de seguridad</span></h3>
+        <p class="text-muted text-small mt-1">Descarga toda la base de datos (apps, usuarios, launchers, reseñas) en un único fichero <code>.db</code>. Los backups automáticos también se guardan en el volumen de datos.</p>
+        <button class="btn btn-primary mt-2" id="backup-btn">⬇ <span data-i18n="admin.backup_download">Descargar backup</span></button>
+      </div>
+      <div class="detail-card" style="max-width:640px">
+        <h3>♻️ <span data-i18n="admin.restore">Restaurar</span></h3>
+        <p class="text-muted text-small mt-1">Sube un fichero <code>.db</code> para <strong>reemplazar</strong> la base de datos actual. Esta acción es irreversible: haz un backup antes.</p>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center" class="mt-2">
+          <input id="restore-file" type="file" accept=".db"/>
+          <button class="btn btn-danger" id="restore-btn">♻️ <span data-i18n="admin.restore_now">Restaurar ahora</span></button>
+        </div>
+      </div>
+    </div>
   </main>
 </div>
 
@@ -67,6 +86,7 @@
   <button onclick="showTab('allapps')"  id="mob-allapps"><span class="ico">📦</span><span>Apps</span></button>
   <button onclick="showTab('cats')"     id="mob-cats"><span class="ico">🏷</span><span>Cats.</span></button>
   <button onclick="showTab('users')"    id="mob-users"><span class="ico">👥</span><span>Usuarios</span></button>
+  <button onclick="showTab('maint')"    id="mob-maint"><span class="ico">🛟</span><span>Manten.</span></button>
 </div>
 
 <!-- Category modal -->
@@ -115,7 +135,7 @@ const t   = k => I18N.t(k);
 const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
 // ── Tabs ──────────────────────────────────────────────────────────────────
-const TABS = ['pending','allapps','cats','users'];
+const TABS = ['pending','allapps','cats','users','maint'];
 function showTab(name) {
   TABS.forEach(n => {
     document.getElementById(`tab-${n}`).style.display = n === name ? '' : 'none';
@@ -333,7 +353,10 @@ async function loadUsers() {
             </td>
             <td class="text-muted text-small">${new Date(u.created_at).toLocaleDateString()}</td>
             <td>
-              <button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id},'${esc(u.name)}')">🗑</button>
+              <div class="flex gap-1">
+                <button class="btn btn-ghost btn-sm" onclick="resetUserPassword(${u.id},'${esc(u.name)}')" title="Resetear contraseña">🔑</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id},'${esc(u.name)}')">🗑</button>
+              </div>
             </td>
           </tr>`).join('')}
         </tbody>
@@ -352,6 +375,44 @@ async function deleteUser(id, name) {
   toast.success(t('msg.deleted'));
   loadUsers();
 }
+
+async function resetUserPassword(id, name) {
+  const pw = prompt(`Nueva contraseña para "${name}" (mín. 6 caracteres):`);
+  if (!pw) return;
+  if (pw.length < 6) return toast.error('Mínimo 6 caracteres');
+  try { await API.adminResetPassword(id, pw); toast.success('Contraseña restablecida'); }
+  catch (ex) { toast.error(ex.message); }
+}
+
+// ── Mantenimiento: backup / restore ─────────────────────────────────────────
+document.getElementById('backup-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('backup-btn');
+  btn.disabled = true;
+  try {
+    const blob = await API.adminBackupBlob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `wappstore-${new Date().toISOString().slice(0,10)}.db`;
+    a.click(); URL.revokeObjectURL(a.href);
+    toast.success('Backup descargado');
+  } catch (ex) { toast.error(ex.message); }
+  finally { btn.disabled = false; }
+});
+
+document.getElementById('restore-btn').addEventListener('click', async () => {
+  const f = document.getElementById('restore-file').files[0];
+  if (!f) return toast.error('Elige un fichero .db');
+  if (!confirm('Esto REEMPLAZA toda la base de datos actual. ¿Continuar?')) return;
+  const btn = document.getElementById('restore-btn');
+  btn.disabled = true;
+  try {
+    const fd = new FormData(); fd.append('db', f);
+    await API.adminRestore(fd);
+    toast.success('Base de datos restaurada');
+    loadStats(); showTab('allapps');
+  } catch (ex) { toast.error(ex.message); }
+  finally { btn.disabled = false; }
+});
 
 document.addEventListener('langchange', () => I18N.applyAll());
 

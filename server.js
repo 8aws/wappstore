@@ -27,8 +27,27 @@ const UPLOAD_DIR = path.join(__dirname, 'uploads');
 fs.mkdirSync(path.join(__dirname, 'data'), { recursive: true });
 
 // ── Init DB ────────────────────────────────────────────────────────────────
-const { initDb } = require('./src/database');
+const { initDb, backupTo, DB_PATH } = require('./src/database');
 initDb();
+
+// ── Backups automáticos de la DB ────────────────────────────────────────────
+const BACKUP_HOURS = parseInt(process.env.BACKUP_INTERVAL_HOURS ?? '24', 10);
+const BACKUP_KEEP  = parseInt(process.env.BACKUP_KEEP ?? '7', 10);
+if (BACKUP_HOURS > 0) {
+  const backupDir = path.join(path.dirname(DB_PATH), 'backups');
+  const runBackup = async () => {
+    try {
+      fs.mkdirSync(backupDir, { recursive: true });
+      const dest = path.join(backupDir, `wappstore-${new Date().toISOString().replace(/[:.]/g,'-')}.db`);
+      await backupTo(dest);
+      const files = fs.readdirSync(backupDir).filter(f => f.endsWith('.db')).sort();
+      while (files.length > BACKUP_KEEP) fs.rmSync(path.join(backupDir, files.shift()));
+      console.log(`🗄️  Backup creado: ${path.basename(dest)} (conservando ${BACKUP_KEEP})`);
+    } catch (e) { console.warn('⚠️  Backup falló:', e.message); }
+  };
+  setTimeout(runBackup, 60 * 1000);                         // uno al minuto de arrancar
+  setInterval(runBackup, BACKUP_HOURS * 60 * 60 * 1000);    // y cada N horas
+}
 
 // ── Middleware ─────────────────────────────────────────────────────────────
 const { securityHeaders } = require('./src/middleware/security');

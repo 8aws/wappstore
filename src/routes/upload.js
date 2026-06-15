@@ -6,9 +6,34 @@ const path   = require('path');
 const fs     = require('fs');
 const { getDb } = require('../database');
 const { requireAuth } = require('../middleware/auth');
+const { assertPublicUrl } = require('../utils/validate');
 const { generateIcons, processScreenshot } = require('../utils/icons');
 
 const UPLOAD_DIR = path.join(__dirname, '..', '..', 'uploads');
+
+// Procesa un fichero como logo de la app: 512×512 PNG + genera todos los iconos.
+async function applyLogo(db, app, srcPath) {
+  const logoDir = path.join(UPLOAD_DIR, 'logos', app.slug);
+  fs.mkdirSync(logoDir, { recursive: true });
+  const logoPath = path.join(logoDir, 'logo.png');
+
+  await sharp(srcPath)
+    .resize(512, 512, { fit: 'contain', background: { r:0, g:0, b:0, alpha:0 } })
+    .png()
+    .toFile(logoPath);
+
+  const logoUrl = `/uploads/logos/${app.slug}/logo.png`;
+  db.prepare("UPDATE apps SET logo_url=?,updated_at=datetime('now') WHERE id=?").run(logoUrl, app.id);
+
+  const result = await generateIcons(logoPath, app.slug);
+  db.prepare('DELETE FROM app_icons WHERE app_id=?').run(app.id);
+  const ins = db.prepare('INSERT INTO app_icons(app_id,icon_type,url,size) VALUES(?,?,?,?)');
+  result.icons.forEach(i => ins.run(app.id, i.name, i.url, i.size));
+  ins.run(app.id, 'favicon.ico', `/uploads/icons/${app.slug}/favicon.ico`, 0);
+  db.prepare('UPDATE apps SET icons_zip_url=? WHERE id=?').run(result.zip_url, app.id);
+
+  return { logo_url: logoUrl, ...result };
+}
 
 const tempStorage = multer.diskStorage({
   destination: (_, __, cb) => {
@@ -46,36 +71,40 @@ router.post('/logo/:appId', upload.single('logo'), async (req, res) => {
     if (!app)      return res.status(404).json({ error: 'App not found' });
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
-    // Save processed logo (512×512 PNG with transparency)
-    const logoDir = path.join(UPLOAD_DIR, 'logos', app.slug);
-    fs.mkdirSync(logoDir, { recursive: true });
-    const logoPath = path.join(logoDir, 'logo.png');
-
-    await sharp(tmpPath)
-      .resize(512, 512, { fit: 'contain', background: { r:0, g:0, b:0, alpha:0 } })
-      .png()
-      .toFile(logoPath);
+    const result = await applyLogo(db, app, tmpPath);
     fs.unlinkSync(tmpPath);
-
-    const logoUrl = `/uploads/logos/${app.slug}/logo.png`;
-    db.prepare("UPDATE apps SET logo_url=?,updated_at=datetime('now') WHERE id=?").run(logoUrl, app.id);
-
-    // Generate all icon sizes
-    const result = await generateIcons(logoPath, app.slug);
-
-    // Persist icons in DB
-    db.prepare('DELETE FROM app_icons WHERE app_id=?').run(app.id);
-    const ins = db.prepare('INSERT INTO app_icons(app_id,icon_type,url,size) VALUES(?,?,?,?)');
-    result.icons.forEach(i => ins.run(app.id, i.name, i.url, i.size));
-    ins.run(app.id, 'favicon.ico', `/uploads/icons/${app.slug}/favicon.ico`, 0);
-
-    db.prepare("UPDATE apps SET icons_zip_url=? WHERE id=?").run(result.zip_url, app.id);
-
-    res.json({ logo_url: logoUrl, ...result });
+    res.json(result);
   } catch (err) {
     console.error('Logo upload error:', err);
     if (tmpPath && fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/upload/logo-url/:appId { url } — descarga un icono remoto como logo
+router.post('/logo-url/:appId', async (req, res) => {
+  let tmpPath;
+  try {
+    const db  = getDb();
+    const app = getApp(db, req.params.appId, req.user.id, req.user.role);
+    if (!app) return res.status(404).json({ error: 'App not found' });
+
+    const url = await assertPublicUrl(req.body.url || '');
+    const resp = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(15000) });
+    if (!resp.ok) return res.status(400).json({ error: `No se pudo descargar el icono (HTTP ${resp.status})` });
+    const buf = Buffer.from(await resp.arrayBuffer());
+    if (buf.length > 15 * 1024 * 1024) return res.status(400).json({ error: 'Icono demasiado grande' });
+
+    tmpPath = path.join(UPLOAD_DIR, 'temp', `dl-${Date.now()}.img`);
+    fs.mkdirSync(path.dirname(tmpPath), { recursive: true });
+    fs.writeFileSync(tmpPath, buf);
+
+    const result = await applyLogo(db, app, tmpPath);
+    fs.unlinkSync(tmpPath);
+    res.json(result);
+  } catch (err) {
+    if (tmpPath && fs.existsSync(tmpPath)) { try { fs.unlinkSync(tmpPath); } catch {} }
+    res.status(400).json({ error: err.message });
   }
 });
 

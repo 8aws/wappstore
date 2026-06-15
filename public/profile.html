@@ -19,25 +19,25 @@
 <nav class="nav" id="main-nav"></nav>
 
 <div class="profile-wrap">
-  <h1>👤 Mi perfil</h1>
+  <h1>👤 <span data-i18n="profile.title">Mi perfil</span></h1>
 
   <div class="detail-card">
-    <h3>Datos de la cuenta</h3>
+    <h3 data-i18n="profile.account">Datos de la cuenta</h3>
     <form id="profile-form" class="mt-2">
-      <div class="form-row"><label>Nombre</label><input id="p-name" type="text" required/></div>
-      <div class="form-row"><label>Email</label><input id="p-email" type="email" required/></div>
-      <div class="form-row"><label>Rol</label><input id="p-role" type="text" disabled/></div>
-      <button class="btn btn-primary" type="submit">Guardar cambios</button>
+      <div class="form-row"><label data-i18n="profile.name">Nombre</label><input id="p-name" type="text" required/></div>
+      <div class="form-row"><label data-i18n="profile.email">Email</label><input id="p-email" type="email" required/></div>
+      <div class="form-row"><label data-i18n="profile.role">Rol</label><input id="p-role" type="text" disabled/></div>
+      <button class="btn btn-primary" type="submit" data-i18n="profile.save">Guardar cambios</button>
     </form>
   </div>
 
   <div class="detail-card mt-2">
-    <h3>Cambiar contraseña</h3>
+    <h3 data-i18n="profile.change_pw">Cambiar contraseña</h3>
     <form id="pw-form" class="mt-2">
-      <div class="form-row"><label>Contraseña actual</label><input id="pw-cur" type="password" required/></div>
-      <div class="form-row"><label>Nueva contraseña (mín. 6)</label><input id="pw-new" type="password" minlength="6" required/></div>
-      <div class="form-row"><label>Repetir nueva contraseña</label><input id="pw-new2" type="password" minlength="6" required/></div>
-      <button class="btn btn-primary" type="submit">Actualizar contraseña</button>
+      <div class="form-row"><label data-i18n="profile.cur_pw">Contraseña actual</label><input id="pw-cur" type="password" required/></div>
+      <div class="form-row"><label data-i18n="profile.new_pw">Nueva contraseña (mín. 6)</label><input id="pw-new" type="password" minlength="6" required/></div>
+      <div class="form-row"><label data-i18n="profile.repeat_pw">Repetir nueva contraseña</label><input id="pw-new2" type="password" minlength="6" required/></div>
+      <button class="btn btn-primary" type="submit" data-i18n="profile.update_pw">Actualizar contraseña</button>
     </form>
   </div>
 </div>

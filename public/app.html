@@ -53,6 +53,15 @@
   </div>
 </div>
 
+<!-- Reviews -->
+<div id="reviews-section" class="screenshots-section" style="display:none">
+  <div class="screenshots-inner" style="max-width:820px;margin:0 auto">
+    <h3 style="margin-bottom:.75rem">⭐ <span id="reviews-title">Valoraciones</span></h3>
+    <div id="my-review"></div>
+    <div id="reviews-list" class="mt-2"></div>
+  </div>
+</div>
+
 <!-- Lightbox -->
 <div id="lightbox" class="lightbox" style="display:none">
   <button class="lightbox-close" onclick="closeLightbox()">✕</button>
@@ -96,8 +105,10 @@ async function loadApp() {
   const platform = app.platform ? `<span class="platform-badge">${app.platform.toUpperCase()}</span>` : '';
   const featured = app.featured ? `<span class="featured-badge">⭐ Destacada</span>` : '';
   const devName  = app.developer?.name ? `<span class="text-muted">por ${esc(app.developer.name)}</span>` : '';
+  const rating   = app.rating_count ? `<span class="cat-badge" title="${app.rating_count} valoraciones">⭐ ${app.rating_avg} (${app.rating_count})</span>` : '';
   meta.innerHTML = `
     ${catName ? `<span class="cat-badge">${catName}</span>` : ''}
+    ${rating}
     ${platform} ${featured} ${devName}
     ${app.version ? `<span class="text-muted text-small">v${esc(app.version)}</span>` : ''}
   `;
@@ -162,6 +173,9 @@ async function loadApp() {
     ).join('');
   }
 
+  // Reviews
+  renderReviews(app);
+
   // Icons — solo visible para developer y admin
   if (app.icons?.length && Auth.hasRole('developer','admin')) {
     const card = document.getElementById('icons-card');
@@ -178,6 +192,63 @@ async function loadApp() {
       document.getElementById('icons-download-btn').href = app.icons_zip_url;
     }
   }
+}
+
+const stars = n => '★★★★★☆☆☆☆☆'.slice(5 - Math.round(n), 10 - Math.round(n));
+
+async function renderReviews(app) {
+  const sec = document.getElementById('reviews-section');
+  sec.style.display = '';
+  document.getElementById('reviews-title').textContent =
+    app.rating_count ? `Valoraciones · ${app.rating_avg} (${app.rating_count})` : 'Valoraciones';
+
+  // Lista de reseñas
+  const list = document.getElementById('reviews-list');
+  list.innerHTML = (app.reviews || []).length
+    ? app.reviews.map(r => `
+        <div class="detail-card" style="margin-bottom:.6rem">
+          <div class="flex-b"><strong>${esc(r.user_name)}</strong>
+            <span style="color:#F5A623">${stars(r.rating)}</span></div>
+          ${r.comment ? `<p class="text-muted" style="margin-top:.35rem;font-size:.9rem;white-space:pre-wrap">${esc(r.comment)}</p>` : ''}
+          <div class="text-small text-muted" style="margin-top:.25rem">${new Date(r.created_at).toLocaleDateString()}</div>
+        </div>`).join('')
+    : '<p class="text-muted text-small">Sé el primero en valorar esta app.</p>';
+
+  // Formulario (solo logueados)
+  const my = document.getElementById('my-review');
+  if (!Auth.isLoggedIn()) {
+    my.innerHTML = '<p class="text-small text-muted">Inicia sesión para dejar tu valoración.</p>';
+    return;
+  }
+  let mine = null;
+  try { mine = await API.getMyReview(app.id); } catch {}
+  let pick = mine?.rating || 0;
+  my.innerHTML = `
+    <div class="detail-card" style="margin-bottom:1rem">
+      <div class="flex-b"><strong>${mine ? 'Tu valoración' : 'Deja tu valoración'}</strong>
+        ${mine ? '<button class="btn btn-ghost btn-sm" id="rev-del">Eliminar</button>' : ''}</div>
+      <div id="star-pick" style="font-size:1.6rem;cursor:pointer;color:#F5A623;letter-spacing:.15rem;margin:.4rem 0">
+        ${[1,2,3,4,5].map(i => `<span data-v="${i}">${i <= pick ? '★' : '☆'}</span>`).join('')}
+      </div>
+      <textarea id="rev-comment" rows="3" placeholder="Comentario (opcional)" style="width:100%">${esc(mine?.comment || '')}</textarea>
+      <button class="btn btn-primary mt-1" id="rev-save">${mine ? 'Actualizar' : 'Enviar valoración'}</button>
+    </div>`;
+
+  const paint = () => document.querySelectorAll('#star-pick span').forEach(s =>
+    s.textContent = (+s.dataset.v <= pick) ? '★' : '☆');
+  document.querySelectorAll('#star-pick span').forEach(s =>
+    s.addEventListener('click', () => { pick = +s.dataset.v; paint(); }));
+  document.getElementById('rev-save').addEventListener('click', async () => {
+    if (!pick) return toast.error('Elige una puntuación');
+    try {
+      await API.saveReview({ app_id: app.id, rating: pick, comment: document.getElementById('rev-comment').value });
+      toast.success('¡Gracias por tu valoración!'); loadApp();
+    } catch (e) { toast.error(e.message || 'Error'); }
+  });
+  document.getElementById('rev-del')?.addEventListener('click', async () => {
+    try { await API.deleteReview(app.id); toast.success('Valoración eliminada'); loadApp(); }
+    catch (e) { toast.error(e.message || 'Error'); }
+  });
 }
 
 function openLightbox(src)  { document.getElementById('lightbox').style.display='flex'; document.getElementById('lightbox-img').src=src; }

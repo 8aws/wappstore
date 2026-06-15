@@ -1,8 +1,16 @@
 'use strict';
 const router = require('express').Router();
-const { getDb } = require('../database');
+const multer = require('multer');
+const bcrypt = require('bcryptjs');
+const fs     = require('fs');
+const os     = require('os');
+const path   = require('path');
+const Database = require('better-sqlite3');
+const { getDb, backupTo, restoreFrom } = require('../database');
 const { requireAuth } = require('../middleware/auth');
 const { isHttpUrl } = require('../utils/validate');
+
+const dbUpload = multer({ dest: os.tmpdir(), limits: { fileSize: 200 * 1024 * 1024 } });
 
 router.use(requireAuth(['admin']));
 
@@ -116,6 +124,17 @@ router.put('/users/:id', (req, res) => {
   res.json({ success: true });
 });
 
+// PUT /api/admin/users/:id/password { new_password } — el admin resetea a cualquiera
+router.put('/users/:id/password', (req, res) => {
+  const pw = (req.body.new_password || '').toString();
+  if (pw.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  const db = getDb();
+  const u = db.prepare('SELECT id FROM users WHERE id=?').get(req.params.id);
+  if (!u) return res.status(404).json({ error: 'User not found' });
+  db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(bcrypt.hashSync(pw, 10), req.params.id);
+  res.json({ success: true });
+});
+
 router.delete('/users/:id', (req, res) => {
   if (+req.params.id === req.user.id) return res.status(400).json({ error: 'Cannot delete yourself' });
   getDb().prepare('DELETE FROM users WHERE id=?').run(req.params.id);
@@ -152,6 +171,40 @@ router.delete('/categories/:id', (req, res) => {
 router.delete('/screenshots/:id', (req, res) => {
   getDb().prepare('DELETE FROM screenshots WHERE id=?').run(req.params.id);
   res.json({ success: true });
+});
+
+// ── Backup / restore de la base de datos ──────────────────────────────────
+// GET /api/admin/backup → descarga un snapshot consistente del .db
+router.get('/backup', async (req, res) => {
+  const tmp = path.join(os.tmpdir(), `wappstore-backup-${Date.now()}.db`);
+  try {
+    await backupTo(tmp);
+    const name = `wappstore-${new Date().toISOString().slice(0,10)}.db`;
+    res.download(tmp, name, () => { try { fs.rmSync(tmp); } catch {} });
+  } catch (e) {
+    try { fs.rmSync(tmp); } catch {}
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/admin/restore (multipart, campo 'db') → reemplaza la DB
+router.post('/restore', dbUpload.single('db'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+  const tmp = req.file.path;
+  try {
+    // Valida que sea una DB SQLite válida con la tabla users
+    const test = new Database(tmp, { readonly: true });
+    const ok = test.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='users'").get();
+    test.close();
+    if (!ok) { fs.rmSync(tmp); return res.status(400).json({ error: 'El fichero no es una base de datos WAppStore válida' }); }
+
+    restoreFrom(tmp);
+    fs.rmSync(tmp);
+    res.json({ success: true });
+  } catch (e) {
+    try { fs.rmSync(tmp); } catch {}
+    res.status(400).json({ error: 'Restore failed: ' + e.message });
+  }
 });
 
 module.exports = router;
