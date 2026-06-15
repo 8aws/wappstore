@@ -1,0 +1,86 @@
+# ── WAppStore · ZimaOS / CasaOS app ───────────────────────────────────────
+# Importa este archivo desde ZimaOS para que aparezca el icono en el escritorio:
+#   App Store  →  botón "+" (arriba a la derecha)  →  "Install a customized app"
+#   →  pega este YAML  →  Install
+#
+# Un `docker pull` por terminal NO crea el tile del escritorio: ZimaOS solo
+# muestra las apps que instala su propio gestor a través de este compose.
+# La imagen es multi-arquitectura (amd64 + arm64), funciona en cualquier ZimaOS.
+# ──────────────────────────────────────────────────────────────────────────
+name: wappstore
+services:
+  wappstore:
+    image: ghcr.io/8aws/wappstore:latest
+    container_name: wappstore
+    restart: unless-stopped
+    ports:
+      - target: 3000
+        published: "3000"
+        protocol: tcp
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      # ⚠️ Cambia este secreto:  openssl rand -base64 48
+      - JWT_SECRET=CHANGE_ME_openssl_rand_base64_48
+      - ADMIN_EMAIL=admin@wappstore.local
+      - ADMIN_PASSWORD=Admin1234!
+      - DB_PATH=/app/data/wappstore.db
+    volumes:
+      - type: bind
+        source: /DATA/AppData/wappstore/data
+        target: /app/data
+      - type: bind
+        source: /DATA/AppData/wappstore/uploads
+        target: /app/uploads
+    x-casaos:
+      ports:
+        - container: "3000"
+          description:
+            en_us: Web interface
+            es_es: Interfaz web
+      volumes:
+        - container: /app/data
+          description:
+            en_us: SQLite database
+            es_es: Base de datos SQLite
+        - container: /app/uploads
+          description:
+            en_us: Uploaded logos, screenshots and icons
+            es_es: Logos, capturas e iconos subidos
+      envs:
+        - container: JWT_SECRET
+          description:
+            en_us: "Secret for JWT tokens — generate with: openssl rand -base64 48"
+            es_es: "Secreto para tokens JWT — genéralo con: openssl rand -base64 48"
+        - container: ADMIN_EMAIL
+          description:
+            en_us: Initial admin email
+            es_es: Email del admin inicial
+        - container: ADMIN_PASSWORD
+          description:
+            en_us: Initial admin password
+            es_es: Contraseña del admin inicial
+
+x-casaos:
+  architectures:
+    - amd64
+    - arm64
+  main: wappstore
+  author: 8aws
+  developer: 8aws
+  category: Utilities
+  title:
+    en_us: WAppStore
+  tagline:
+    en_us: Self-hosted PWA & WebApp store
+    es_es: Tienda de PWAs y WebApps autoalojada
+  description:
+    en_us: Catalog, admin panel, developer dashboard and clients for PWAs and WebApps.
+    es_es: Catálogo, panel de administración, panel de desarrollador y clientes para PWAs y WebApps.
+  icon: https://github.com/8aws.png
+  thumbnail: ""
+  screenshot_link: []
+  scheme: http
+  index: /
+  port_map: "3000"
+  webui_port: 3000

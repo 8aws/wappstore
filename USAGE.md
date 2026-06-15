@@ -14,6 +14,20 @@ docker compose up -d
 open http://localhost:3000
 ```
 
+## Instalar en ZimaOS / CasaOS (icono en el escritorio)
+
+> ⚠️ Un `docker pull` por terminal **no** crea el icono en el escritorio de ZimaOS.
+> ZimaOS solo muestra las apps que instala su propio gestor mediante un compose con
+> metadatos `x-casaos`. Usa el archivo [`zimaos-compose.yml`](zimaos-compose.yml):
+
+1. En ZimaOS abre **App Store**.
+2. Pulsa el botón **`+`** (arriba a la derecha) → **Install a customized app**.
+3. Pega el contenido de [`zimaos-compose.yml`](zimaos-compose.yml).
+4. Cambia `JWT_SECRET`, `ADMIN_EMAIL` y `ADMIN_PASSWORD`.
+5. **Install** → aparece el icono en el escritorio y un botón "Open Web UI".
+
+La imagen es multi-arquitectura (amd64 + arm64), así que funciona en cualquier ZimaOS.
+
 ## Arrancar en local (Node.js)
 
 ```bash
