@@ -49,6 +49,8 @@ docker pull ghcr.io/8aws/wappstore:1.2.0
 
 ## Notas
 
+- Las imágenes de release son **multi-arquitectura**: `linux/amd64` + `linux/arm64`
+  (Apple Silicon, Raspberry Pi, servidores ARM). Docker elige la variante correcta al hacer `pull`.
 - La versión de la imagen viene del **tag git**, no de `package.json`. Mantén ambos en
   sincronía si te importa la coherencia (`npm version <x>` actualiza `package.json` y crea el tag).
 - ⚠️ Este repo es **público**: nunca pongas secretos reales en archivos versionados
