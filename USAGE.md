@@ -84,6 +84,24 @@ no afecta a un admin ya existente. Para restablecerlo:
 
 Cada usuario puede además cambiar su propia contraseña y datos en `/profile.html`.
 
+## Migrar apps entre instancias
+
+Para copiar las apps de una instancia a otra (p. ej. de la antigua a la nueva)
+sin tocar ficheros del servidor, usa el script de migración. Descarga y re-sube
+logos y capturas, regenera iconos y aprueba cada app. Es **idempotente** (omite
+las que ya existen):
+
+```bash
+SRC=https://wappstore.uverse.es \
+DST=https://NUEVA-INSTANCIA \
+ADMIN_EMAIL=admin@... ADMIN_PASSWORD=tu-pass \
+node scripts/migrate-apps.mjs
+```
+
+`DST` debe ser tu instalación nueva y las credenciales, las de su admin.
+(Alternativa sin script: con acceso al servidor, copia `wappstore.db` y `uploads/`
+del origen al destino; la DB se migra sola al arrancar.)
+
 ## Variables de entorno
 
 | Variable        | Default                  | Descripción                    |
