@@ -24,6 +24,8 @@ services:
       - JWT_SECRET=CHANGE_ME_openssl_rand_base64_48
       - ADMIN_EMAIL=admin@wappstore.local
       - ADMIN_PASSWORD=CHANGE_ME_set_a_strong_password
+      # Para recuperar el acceso del admin: descomenta, reinicia, entra, y vuelve a comentar.
+      # - ADMIN_RESET=1
       - DB_PATH=/app/data/wappstore.db
     volumes:
       - type: bind

@@ -72,6 +72,18 @@ Al subir el logo de una app se generan automáticamente:
 
 Todo empaquetado en un ZIP descargable desde la ficha de la app.
 
+## Recuperar el acceso de admin (olvido de contraseña)
+
+El admin solo se crea en el **primer arranque**; cambiar `ADMIN_PASSWORD` después
+no afecta a un admin ya existente. Para restablecerlo:
+
+1. Añade `ADMIN_RESET=1` a las variables de entorno (junto con el `ADMIN_EMAIL`
+   y el `ADMIN_PASSWORD` nuevo que quieras).
+2. Reinicia el contenedor → en el log verás `ADMIN_RESET: contraseña restablecida`.
+3. Entra con la nueva contraseña y **quita `ADMIN_RESET`** del entorno.
+
+Cada usuario puede además cambiar su propia contraseña y datos en `/profile.html`.
+
 ## Variables de entorno
 
 | Variable        | Default                  | Descripción                    |
@@ -80,4 +92,6 @@ Todo empaquetado en un ZIP descargable desde la ficha de la app.
 | JWT_SECRET      | (cambiar en producción)  | Secreto para tokens JWT        |
 | ADMIN_EMAIL     | admin@wappstore.local    | Email del admin inicial        |
 | ADMIN_PASSWORD  | Admin1234!               | Contraseña del admin inicial   |
+| ADMIN_RESET     | (sin definir)            | =1 restablece la pass del admin en el arranque |
+| NODE_ENV        | (sin definir)            | =production exige un JWT_SECRET propio |
 | DB_PATH         | ./data/wappstore.db      | Ruta de la base de datos       |

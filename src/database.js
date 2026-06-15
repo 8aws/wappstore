@@ -90,10 +90,20 @@ function initDb() {
       size      INTEGER
     );
 
+    CREATE TABLE IF NOT EXISTS launcher_folders (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name       TEXT    NOT NULL,
+      icon       TEXT    DEFAULT '📁',
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS library (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       app_id     INTEGER NOT NULL REFERENCES apps(id)  ON DELETE CASCADE,
+      folder_id  INTEGER,
       sort_order INTEGER NOT NULL DEFAULT 0,
       added_at   TEXT    NOT NULL DEFAULT (datetime('now')),
       UNIQUE(user_id, app_id)
@@ -105,6 +115,12 @@ function initDb() {
     CREATE INDEX IF NOT EXISTS idx_apps_featured  ON apps(featured);
     CREATE INDEX IF NOT EXISTS idx_library_user   ON library(user_id);
   `);
+
+  // Migración: añadir library.folder_id a DBs creadas antes de v1.3.0
+  const libCols = db.prepare('PRAGMA table_info(library)').all().map(c => c.name);
+  if (!libCols.includes('folder_id')) {
+    db.exec('ALTER TABLE library ADD COLUMN folder_id INTEGER');
+  }
 
   // Seed categories
   const catCount = db.prepare('SELECT COUNT(*) as c FROM categories').get().c;
@@ -131,6 +147,22 @@ function initDb() {
       'Admin', mail, bcrypt.hashSync(pw, 10), 'admin'
     );
     console.log(`   → Admin seeded: ${mail}`);
+  }
+
+  // ADMIN_RESET=1 → restablece (o crea) el admin desde el entorno, aunque ya exista.
+  // Úsalo una vez para recuperar el acceso; luego quita la variable.
+  if (['1', 'true', 'yes'].includes(String(process.env.ADMIN_RESET || '').toLowerCase())) {
+    const pw   = process.env.ADMIN_PASSWORD || 'Admin1234!';
+    const mail = process.env.ADMIN_EMAIL    || 'admin@wappstore.local';
+    const hash = bcrypt.hashSync(pw, 10);
+    const existing = db.prepare('SELECT id FROM users WHERE email=?').get(mail);
+    if (existing) {
+      db.prepare("UPDATE users SET password_hash=?, role='admin', active=1 WHERE email=?").run(hash, mail);
+      console.log(`   → ADMIN_RESET: contraseña restablecida para ${mail}`);
+    } else {
+      db.prepare("INSERT INTO users(name,email,password_hash,role) VALUES('Admin',?,?,'admin')").run(mail, hash);
+      console.log(`   → ADMIN_RESET: admin creado ${mail}`);
+    }
   }
 
   return db;

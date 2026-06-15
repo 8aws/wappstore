@@ -52,11 +52,21 @@ window.API = (() => {
     login:    (email, pw) => req('POST', '/api/auth/login',    { email, password: pw }),
     register: (d)         => req('POST', '/api/auth/register', d),
     me:       ()          => req('GET',  '/api/auth/me'),
+    // Perfil
+    getProfile:    ()  => req('GET', '/api/me/profile'),
+    updateProfile: (d) => req('PUT', '/api/me/profile', d),
+    changePassword:(cur,nw) => req('PUT', '/api/me/password', { current_password: cur, new_password: nw }),
     // Launcher / biblioteca personal
     getLibrary:      ()      => req('GET',    '/api/me/library'),
     addToLibrary:    (appId) => req('POST',   '/api/me/library', { app_id: appId }),
     removeFromLibrary:(appId)=> req('DELETE', `/api/me/library/${appId}`),
     reorderLibrary:  (order) => req('PUT',    '/api/me/library/reorder', { order }),
+    setAppFolder:    (appId, folderId) => req('PUT', `/api/me/library/${appId}/folder`, { folder_id: folderId }),
+    // Carpetas del launcher
+    getFolders:    ()      => req('GET',    '/api/me/folders'),
+    createFolder:  (name, icon) => req('POST', '/api/me/folders', { name, icon }),
+    updateFolder:  (id, d) => req('PUT',    `/api/me/folders/${id}`, d),
+    deleteFolder:  (id)    => req('DELETE', `/api/me/folders/${id}`),
     // Developer
     myApps:       ()    => req('GET',    '/api/developer/apps'),
     myApp:        (id)  => req('GET',    `/api/developer/apps/${id}`),
