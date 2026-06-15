@@ -10,6 +10,10 @@ permissions:
   contents: write # crear la GitHub Release
   packages: write # publicar en GHCR
 
+# Ejecuta las JS actions sobre Node 24 (default desde 2026-06-16); silencia el aviso de deprecación.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   release:
     name: Build, push & release
